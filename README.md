@@ -1,2 +1,0 @@
-# greendetective
-Green Detective
