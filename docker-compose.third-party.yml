@@ -1,0 +1,44 @@
+services:
+  green-detective-postgresdb:
+    container_name: green-detective-postgresdb
+    image: postgres:13.3
+    command: postgres -c 'max_connections=300'
+    shm_size: 256m
+    volumes:
+      - ./docker/database_mount/pgsql_docker_mount:/var/lib/postgresql/data
+      - ./docker/database_mount/pgsql_docker_mount_restore:/tmp/restore
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports:
+      - 9500:5432
+    networks:
+      - green-detective-postgresdb
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "root"]
+      interval: 1s
+      timeout: 10s
+      retries: 20
+      start_period: 3s
+  green-detective-redis:
+    container_name: green-detective-redis
+    image: bitnami/redis:latest
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - 9379:6379
+    networks:
+      - green-detective-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 10s
+      retries: 20
+      start_period: 3s
+networks:
+  green-detective-postgresdb:
+    name: green-detective-postgresdb
+    driver: bridge
+  green-detective-redis:
+    name: green-detective-redis
+    driver: bridge

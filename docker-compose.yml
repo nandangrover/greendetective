@@ -1,0 +1,57 @@
+include:
+  - docker-compose.third-party.yml
+services:
+  green-detective-service-api:
+    container_name: green-detective-service-api
+    image: green-detective-service-api:local-dev
+    tty: true
+    build:
+      context: .
+      target: service-api
+      args:
+        - TARGET_ENV=dev
+    volumes:
+      - ./src:/var/www/green-detective
+      - ./docker-compose.task.yml:/var/www/docker-compose.yml
+      - ./docker-compose.common.task.yml:/var/www/docker-compose.common.task.yml
+      - ./coverage:/var/www/coverage
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 9000:8070
+    depends_on:
+      green-detective-postgresdb:
+        condition: service_healthy
+      green-detective-redis:
+        condition: service_healthy
+    networks:
+      - green-detective-service-api
+      - green-detective-postgresdb
+      - green-detective-redis
+      - zevero-backend-service-api
+  green-detective-service-process:
+    container_name: green-detective-service-process
+    image: green-detective-service-process:local-dev
+    tty: true
+    build:
+      context: .
+      target: service-process
+      args:
+        - TARGET_ENV=dev
+    volumes:
+      - ./src:/var/www/green-detective
+    depends_on:
+      green-detective-postgresdb:
+        condition: service_healthy
+      green-detective-redis:
+        condition: service_healthy
+    networks:
+      - green-detective-postgresdb
+      - green-detective-redis
+      - zevero-backend-service-api
+networks:
+  green-detective-service-api:
+    name: green-detective-service-api
+    driver: bridge
+  zevero-backend-service-api:
+    name: zevero-backend-service-api
+    external: true

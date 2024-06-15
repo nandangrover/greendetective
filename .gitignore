@@ -1,0 +1,15 @@
+# Ignore Mac Related
+.DS_Store
+
+# Ignore vscode configs
+.vscode
+
+.idea
+.history
+.ipynb_checkpoints
+
+# Ignore database mounts
+docker/database_mount/pgsql_docker_mount/*
+docker/database_mount/pgsql_docker_mount_restore/*
+docker/database_mount/neo4j_docker_mount/*
+docker/database_mount/neo4j/*
