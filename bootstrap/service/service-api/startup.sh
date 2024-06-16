@@ -2,8 +2,6 @@
 set -e
 python manage.py collectstatic --noinput
 
-python manage.py migrate
-
 # Create superuser
 python manage.py ensure_adminuser --noinput
 
