@@ -20,5 +20,15 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    username = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
     password = serializers.CharField()
+    
+    def validate(self, data):
+        username = data.get("username")
+        email = data.get("email")
+        
+        if not username and not email:
+            raise serializers.ValidationError("A username or email is required to login")
+        
+        return data
