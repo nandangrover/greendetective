@@ -45,7 +45,7 @@ v1_schema_view = get_schema_view(
         default_version="v1",
         description="API schema for Green Detective",
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="info@zevero.earth"),
+        contact=openapi.Contact(email="info@detective.ai"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,

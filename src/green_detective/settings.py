@@ -274,12 +274,11 @@ CACHES = {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.getenv("REDIS_HOST"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        "KEY_PREFIX": "zevero_backend",
+        "KEY_PREFIX": "green_detective",
     }
 }
 
 UNIT_TESTING = sys.argv[1:2] == ["test"]
-TEST_RUNNER = "green_detective.zevero_test_runner.NeoDiscoverRunner"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators

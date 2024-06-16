@@ -27,7 +27,6 @@ services:
       - green-detective-service-api
       - green-detective-postgresdb
       - green-detective-redis
-      - zevero-backend-service-api
   green-detective-service-process:
     container_name: green-detective-service-process
     image: green-detective-service-process:local-dev
@@ -47,11 +46,8 @@ services:
     networks:
       - green-detective-postgresdb
       - green-detective-redis
-      - zevero-backend-service-api
+      - green-detective-service-api
 networks:
   green-detective-service-api:
     name: green-detective-service-api
     driver: bridge
-  zevero-backend-service-api:
-    name: zevero-backend-service-api
-    external: true
