@@ -6,8 +6,8 @@ import uuid
 
 class Report(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_uuid = models.ForeignKey(Company, on_delete=models.CASCADE)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     processing = models.BooleanField(default=True)
     s3_url = models.URLField(max_length=2048)
     created_at = models.DateTimeField(auto_now_add=True)

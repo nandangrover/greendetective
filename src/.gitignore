@@ -60,6 +60,7 @@ Thumbs.db
 
 env.sh
 env
+logs/*
 
 #mediafiles
 media
