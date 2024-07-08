@@ -10,12 +10,13 @@ from detective.models import Company
 
 # TODO: Should be able to process pds, images as well
 class Scraper:
-    def __init__(self, company_uuid, start_url):
+    def __init__(self, company_uuid, start_url, urls_to_process=None):
         self.company = Company.objects.get(uuid=company_uuid)
         self.start_url = start_url
         self.domain = urlparse(start_url).netloc
         self.visited = set()
         self.to_visit = {start_url}
+        self.urls_to_process = urls_to_process
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
@@ -65,22 +66,33 @@ class Scraper:
 
     def crawl_domain_and_save(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            while len(self.to_visit) > 0:
-                new_links = set()
+            if self.urls_to_process:
+                # urls_to_process is array of urls to process, so we don't need to crawl the domain
                 for future in [
-                    executor.submit(self.get_all_links, url) for url in self.to_visit
+                    executor.submit(self.scrape_content, url) for url in self.urls_to_process
                 ]:
-                    new_links.update(future.result())
-                self.visited.update(self.to_visit)
-                self.to_visit = new_links - self.visited
-                self.logger.info(f"Visited: {len(self.visited)}, To visit: {len(self.to_visit)}")
-                time.sleep(1)
+                    url, content = future.result()
+                    if content:
+                        self.save_to_staging(url, content)
+                        
+                    time.sleep(1)
+            else:
+                while len(self.to_visit) > 0:
+                    new_links = set()
+                    for future in [
+                        executor.submit(self.get_all_links, url) for url in self.to_visit
+                    ]:
+                        new_links.update(future.result())
+                    self.visited.update(self.to_visit)
+                    self.to_visit = new_links - self.visited
+                    self.logger.info(f"Visited: {len(self.visited)}, To visit: {len(self.to_visit)}")
+                    time.sleep(1)
 
-            for future in [
-                executor.submit(self.scrape_content, url) for url in self.visited
-            ]:
-                url, content = future.result()
-                if content:
-                    self.save_to_staging(url, content)
+                for future in [
+                    executor.submit(self.scrape_content, url) for url in self.visited
+                ]:
+                    url, content = future.result()
+                    if content:
+                        self.save_to_staging(url, content)
 
-                time.sleep(1)
+                    time.sleep(1)

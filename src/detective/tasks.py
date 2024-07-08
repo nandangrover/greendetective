@@ -1,17 +1,22 @@
 from celery import shared_task
 from detective.utils import StatisticsProcessor, Assistant, start_processing_run
-from detective.models import Run
+from detective.models import Run, Company, Report
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task
-def start_detective(company_uuid):
+def start_detective(company_uuid, report_uuid):
     logger.info("Starting scrapper")
     
-    # Scraper(company_uuid, start_url).crawl_domain_and_save()
-    StatisticsProcessor(company_uuid).process_statistics()
+    company = Company.objects.get(uuid=company_uuid)
+    report = Report.objects.get(uuid=report_uuid)
+    
+    urls_to_process = report.urls if len(report.urls) > 0 else None
+    
+    # Scraper(company_uuid, company.domain, urls_to_process).start_scrapping()
+    StatisticsProcessor(company_uuid).process_raw_statistics()
 
     logger.info("Scrapper finished")
 

@@ -6,6 +6,7 @@ from detective.tasks import start_detective
 class TriggerDetectiveSerializer(serializers.Serializer):
     company_name = serializers.CharField(max_length=255)
     company_domain = serializers.URLField(max_length=200)
+    process_urls = serializers.ListField(child=serializers.URLField())
 
     def create_or_get_company(self, validated_data):
         company_name = validated_data.get("company_name")
@@ -22,8 +23,12 @@ class TriggerDetectiveSerializer(serializers.Serializer):
 
         return company
 
-    def get_report_url(self, company):
-        report = Report.objects.filter(company_uuid=company).first()
+    def get_report_url(self, company, validated_data):
+        urls_to_process = validated_data.get("process_urls")
+        
+        # Filter report by only subset of urls (urls are stored as JSONField in Report model)
+        report = Report.objects.filter(company_uuid=company, urls__contains=urls_to_process).first()
+        
         user = self.context["request"].user
 
         if report and not report.processing:
@@ -31,17 +36,18 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         else:
             # Create a new report if it doesn't exist
             report = Report.objects.create(
-                company=company, user=user
+                company=company, user=user, urls=urls_to_process
             )
 
             # start background task to scrape the domain
-            start_detective.delay(company.uuid)
+            start_detective.delay(company.uuid, report.uuid)
 
             return report.uuid, None, report.processing
 
     def validate(self, data):
         company_name = data.get("company_name")
         company_domain = data.get("company_domain")
+        process_urls = data.get("process_urls")
 
         if not company_name or not company_domain:
             raise serializers.ValidationError("Company name and domain are required")
@@ -49,6 +55,10 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         # domain should be a valid URL
         if not company_domain.startswith("https"):
             raise serializers.ValidationError("Invalid domain URL")
+        
+        # Max 10 urls can be processed at a time
+        if len(process_urls) > 20:
+            raise serializers.ValidationError("Max 10 URLs can be processed at a time")
 
         return data
 
@@ -56,7 +66,7 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         validated_data = self.validated_data
 
         company = self.create_or_get_company(validated_data)
-        report_uuid, s3_url, processing = self.get_report_url(company)
+        report_uuid, s3_url, processing = self.get_report_url(company, validated_data)
 
         return {
             "company": company.uuid,
