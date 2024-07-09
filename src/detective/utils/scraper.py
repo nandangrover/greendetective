@@ -1,11 +1,11 @@
 # scraper.py
 
 import requests
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import concurrent.futures
 import time
-from .models import CompanyStaging
+# from .models import CompanyStaging
 from django.utils import timezone
 import uuid
 

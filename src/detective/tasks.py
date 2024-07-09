@@ -1,5 +1,5 @@
 from celery import shared_task
-from detective.utils import Scrapper
+from detective.utils import Scraper
 import logging
 import time
 
