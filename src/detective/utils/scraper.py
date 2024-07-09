@@ -10,8 +10,8 @@ from detective.models import Company
 
 # TODO: Should be able to process pds, images as well
 class Scraper:
-    def __init__(self, company_uuid, start_url, urls_to_process=None):
-        self.company = Company.objects.get(uuid=company_uuid)
+    def __init__(self, company_id, start_url, urls_to_process=None):
+        self.company = Company.objects.get(uuid=company_id)
         self.start_url = start_url
         self.domain = urlparse(start_url).netloc
         self.visited = set()
@@ -56,7 +56,7 @@ class Scraper:
     def save_to_staging(self, url, raw_html):
         try:
             Staging.objects.create(
-                company_uuid=self.company,
+                company_id=self.company,
                 url=url,
                 raw_html=raw_html,
             )

@@ -3,7 +3,7 @@ import logging
 import os
 from django.db import transaction
 from detective.models import Run, Staging
-from detective.tasks import process_run
+
 
 class Assistant:
     def __init__(self, staging_uuid=None, log_level=logging.INFO):
@@ -16,14 +16,11 @@ class Assistant:
 
         open_ai_api_key = os.getenv("OPEN_AI_API_KEY", None)
 
-        self.staging_data = Staging.objects.get(staging_uuid=staging_uuid)
+        self.staging_data = Staging.objects.get(uuid=staging_uuid)
 
         self.open_ai = OpenAI(api_key=open_ai_api_key)
         self.client = self.open_ai.beta
         self.assistant_id = os.getenv("ASSISTANT_ID", None)
-        self.logger.info(
-            "Assistant initialized for company: {}".format(self.company_uuid)
-        )
 
     def trigger_run(self):
         """
@@ -31,13 +28,17 @@ class Assistant:
         """
         try:
             with transaction.atomic():
+                if self.staging_data.processed == Staging.STATUS_PROCESSED:
+                    self.logger.info(f"Staging data already processed: {self.staging_data.uuid}")
+                    return
+                
                 url = self.staging_data.url
-                knowledge = self.staging_data.knowledge
+                knowledge = self.staging_data.raw_html
                 # Create a thread
                 messages = [
                     {
                         "role": "user",
-                        "content": f"This is the raw data for the url: {url}. \n \n {knowledge}",
+                        "content": f"This is the raw data for the url: {url}. Return data in appropriate JSON structure: \n \n {knowledge}",
                     }
                 ]
                 thread = self.create_thread(messages)
@@ -59,20 +60,21 @@ class Assistant:
         )
 
     def create_run(self, thread_id):
-        
-        run =  self.client.threads.runs.create(
+        from detective.tasks import process_run
+
+        run = self.client.threads.runs.create(
             thread_id=thread_id,
             assistant_id=self.assistant_id,
         )
-        
+
         run_instance = Run.objects.create(
             run_oa_id=run.id,
             thread_oa_id=thread_id,
-            staging_uuid=self.staging_data.staging_uuid,
+            staging=self.staging_data,
         )
-        
-        process_run.delay(self.staging_data.staging_uuid, run_instance.run_uuid)
-        
+
+        process_run.delay(self.staging_data.uuid, run_instance.run_uuid)
+
         return run_instance
 
     def retrieve_thread(self, thread_id):
@@ -80,3 +82,42 @@ class Assistant:
         Retrieves a thread.
         """
         return self.client.threads.retrieve(thread_id=thread_id)
+
+    def retrieve_run(
+        self,
+        thread_id,
+        run_id
+    ):
+        """
+        Retrieves a run.
+        """
+        return self.client.threads.runs.retrieve(
+            thread_id=thread_id,
+            run_id=run_id,
+        )
+        
+    def list_run_steps(
+        self,
+        thread_id,
+        run_id,
+    ):
+        """
+        List steps in a run.
+        """
+        return self.client.threads.runs.steps.list(
+            thread_id=thread_id,
+            run_id=run_id
+        )
+        
+    def retrieve_message(
+        self,
+        thread_id,
+        message_id,
+    ):
+        """
+        Retrieves a message.
+        """
+        return self.client.threads.messages.retrieve(
+            thread_id=thread_id,
+            message_id=message_id
+        )

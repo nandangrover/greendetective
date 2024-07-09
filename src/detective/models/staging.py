@@ -25,4 +25,4 @@ class Staging(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Company Staging {self.uuid} for Company {self.company_uuid}"
+        return f"Company Staging {self.uuid} for Company {self.company}"

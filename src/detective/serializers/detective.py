@@ -27,7 +27,7 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         urls_to_process = validated_data.get("process_urls")
         
         # Filter report by only subset of urls (urls are stored as JSONField in Report model)
-        report = Report.objects.filter(company_uuid=company, urls__contains=urls_to_process).first()
+        report = Report.objects.filter(company_id=company, urls__contains=urls_to_process).first()
         
         user = self.context["request"].user
 

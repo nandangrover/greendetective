@@ -1,11 +1,15 @@
 import logging
 import time
+import json
 from django.conf import settings
-from detective.models import Run, Staging
+from detective.models import Run, Staging, RawStatistics
+from detective.utils import Assistant
 
 logger = logging.getLogger(__name__)
 
 POLLING_MAX_SECONDS = 300
+POLL_INTERVAL = 2
+
 
 def start_processing_run(staging_uuid, run_uuid):
     """
@@ -15,105 +19,140 @@ def start_processing_run(staging_uuid, run_uuid):
     try:
         _start_polling(staging_uuid, run_uuid, 0)
     except Exception as e:
-        _save_run_status(run_uuid, Run.STATUS_FAILED)
+        run = Run.objects.get(run_uuid=run_uuid)
+        _save_run_status(run, Run.STATUS_FAILED)
         _save_staging_status(staging_uuid, Staging.STATUS_FAILED)
 
-        logger.error(f"Error while processing run for staging record: {staging_uuid}, run: {run_uuid}")
-        
+        logger.error(
+            f"Error while processing run for staging record: {staging_uuid}, run: {run_uuid}"
+        )
+
         logger.error(e)
 
 
-def _start_polling(company_uuid, run_uuid, thread_uuid, elapsed_time=0):
+def _start_polling(staging_uuid, run_uuid, elapsed_time=0):
     """
     Start polling for run status.
     """
 
     # Check if elapsed_time exceeds the timeout threshold
     if elapsed_time > POLLING_MAX_SECONDS:
-        logger.error(f"Run processing timed out for thread: {thread_uuid}")
+        logger.error(f"Run processing timed out for run: {run_uuid}")
 
         # Save run as failed in db
         run_instance = Run.objects.get(run_uuid=run_uuid)
         _save_run_status(run_instance, Run.STATUS_FAILED)
         return
 
-    logger.info(f"Processing run for thread: {thread_uuid}, elapsed_time: {elapsed_time}")
+    run_instance = Run.objects.get(run_uuid=run_uuid)
 
-    run = Run.objects.get(run_uuid=run_uuid)
+    logger.info(
+        f"Processing run for thread: {run_instance.thread_oa_id}, run: {run_instance.run_oa_id}"
+    )
+
     # Retrieve thread and run information
-    thread_oa_id = run.thread_oa_id
-    run_oa_id = run.run_oa_id
+    thread_oa_id = run_instance.thread_oa_id
+    run_oa_id = run_instance.run_oa_id
 
     # Retrieve run information from openai
-    conversation_object = Conversation(company_uuid)
-    run = conversation_object.retrieve_run(thread_oa_id, run_oa_id)
+    assistant = Assistant(staging_uuid)
+    run_openai = assistant.retrieve_run(thread_oa_id, run_oa_id)
 
-    status = run.status
+    status = run_openai.status
     if status in [Run.STATUS_IN_PROGRESS, Run.STATUS_QUEUED]:
         # Wait for 2 seconds and then start polling again
-        time.sleep(settings.POLL_INTERVAL)
-        elapsed_time += settings.POLL_INTERVAL
+        time.sleep(POLL_INTERVAL)
+        elapsed_time += POLL_INTERVAL
 
-        steps = conversation_object.list_run_steps(thread_oa_id, run_oa_id)
-        _process_run_steps(conversation_object, thread_oa_id, thread_uuid, run_uuid, steps)
-
-        _start_polling(company_uuid, run_uuid, thread_uuid, elapsed_time)
+        _start_polling(staging_uuid, run_uuid, elapsed_time)
 
     elif status == Run.STATUS_COMPLETED:
-        run_instance = Run.objects.get(run_uuid=run_uuid)
         # Check for new message in thread
-        steps = conversation_object.list_run_steps(thread_oa_id, run_oa_id)
-        _process_run_steps(conversation_object, thread_oa_id, thread_uuid, run_uuid, steps)
+        steps = assistant.list_run_steps(thread_oa_id, run_oa_id)
+        _process_run_steps(assistant, thread_oa_id, staging_uuid, steps)
         _save_run_status(run_instance, Run.STATUS_COMPLETED)
 
     elif status in [Run.STATUS_FAILED, Run.STATUS_CANCELLED, Run.STATUS_EXPIRED]:
         # Save run with appropriate status in db
-        run_instance = Run.objects.get(run_uuid=run_uuid)
         _save_run_status(run_instance, status)
 
     else:
         # Save run as failed in db (default case)
-        run_instance = Run.objects.get(run_uuid=run_uuid)
         _save_run_status(run_instance, Run.STATUS_FAILED)
 
 
-def _save_run_status(run_uuid, status):
-    run = Run.objects.get(run_uuid=run_uuid)
+def _save_run_status(run, status):
     run.status = status
     run.save()
-    
+
+
 def _save_staging_status(staging_uuid, status):
-    staging = Staging.objects.get(staging_uuid=staging_uuid)
-    staging.status = status
+    staging = Staging.objects.get(uuid=staging_uuid)
+    staging.processed = status
     staging.save()
 
 
-def _save_statistic(message, message_type, content, thread_uuid, run_uuid, send_to_channel=True):
+def _process_run_steps(assistant, thread_oa_id, staging_uuid, steps):
+    logger.info(f"Processing run steps for thread: {thread_oa_id}")
+    # Get message_oa_id of all steps
+    message_oa_ids = []
+
+    for step in steps:
+        if step.step_details.type != "message_creation":
+            continue
+        message_id = step.step_details.message_creation.message_id
+        message_oa_ids.append(message_id)
+
+    # reverse the list to save the latest message last
+    message_oa_ids.reverse()
+
+    for message_oa_id in message_oa_ids:
+        message = assistant.retrieve_message(thread_oa_id, message_oa_id)
+
+        # Loop over content and save it in db
+        for content in message.content:
+            if content.type == "text":
+                # convert text to dict
+                content = content.text.value
+
+                # print(content, "content yooo")
+
+                json_content = json.loads(content)
+
+                # if json_content is object, convert it to list
+
+                if isinstance(json_content, dict):
+                    if "claims" in json_content:
+                        json_content = json_content["claims"]
+                    else:
+                        json_content = [json_content]
+
+                # if empty json_content, skip
+                if not json_content:
+                    continue
+
+                _save_statistic(staging_uuid, json_content)
+
+
+def _save_statistic(staging_uuid, content):
     """
-    Save message in db.
-
-    Args:
-        message (Object): Message object
-        message_type (str): Type of message
-        content (str): Content of message
-        thread_uuid (str): UUID of thread
-        run_uuid (str): UUID of run
-
-    Returns:
-        None
+    Save statistice in db.
     """
-    
-    message = Message.objects.create(
-        conversation_thread_id=thread_uuid,
-        run_id=run_uuid,
-        message_oa_id=message.id,
-        message=content,
-        message_type=message_type,
-        type=Message.TYPE_ASSISTANT,
-    )
-    
-    if not message:
-        raise Exception("Error while saving message in db")
+    staging = Staging.objects.get(uuid=staging_uuid)
+    try:
+        for obj in content:
+            if "claim" not in obj or "evaluation" not in obj or "score" not in obj:
+                logger.error(f"Invalid statistic object: {obj}")
+                continue
 
-    
-    return message
+            RawStatistics.objects.create(
+                company=staging.company,
+                staging=staging,
+                claim=obj["claim"],
+                evaluation=obj["evaluation"],
+                score=obj["score"],
+            )
+
+        _save_staging_status(staging_uuid, Staging.STATUS_PROCESSED)
+    except Exception as e:
+        logger.error(f"Failed to save statistic: {e}")
