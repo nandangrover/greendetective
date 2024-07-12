@@ -19,11 +19,11 @@ services:
     ports:
       - 9000:8070
     depends_on:
-      green-detective-postgresdb:
-        condition: service_healthy
-      green-detective-redis:
-        condition: service_healthy
+      - green-detective-localstack-s3
+      - green-detective-postgresdb
+      - green-detective-redis
     networks:
+      - green-detective-localstack-s3
       - green-detective-service-api
       - green-detective-postgresdb
       - green-detective-redis
@@ -39,11 +39,11 @@ services:
     volumes:
       - ./src:/var/www/green-detective
     depends_on:
-      green-detective-postgresdb:
-        condition: service_healthy
-      green-detective-redis:
-        condition: service_healthy
+      - green-detective-localstack-s3
+      - green-detective-postgresdb
+      - green-detective-redis
     networks:
+      - green-detective-localstack-s3
       - green-detective-postgresdb
       - green-detective-redis
       - green-detective-service-api

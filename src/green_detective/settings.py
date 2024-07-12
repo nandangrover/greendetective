@@ -38,9 +38,27 @@ IS_LOCAL = True if SERVER_ENVIRONMENT == "local" else False
 DEBUG = to_bool(os.getenv("DJANGO_DEBUG", False))
 DEBUG_LOG = to_bool(os.getenv("DJANGO_DEBUG_LOG", False))
 
-# AWS
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+REPORT_FILES_LOCATION = "reports"
+REPORT_FILES_STORAGE = "custom_storages.ReportStorage"
+REPORTS_BUCKET = os.environ.get("REPORTS_BUCKET")
+AWS_S3_EXPIRES_IN_REPORT_URL = 60 * 60 * 24 * 7
+
+# -------------------------- AWS S3 Bucket Configurations --------------------------
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.environ.get("AWS_DEFAULT_REGION")
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_S3_VERIFY = True
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
+
+# For S3Boto3Storage
+AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None)
 
 # -------------------------- CORS Configurations --------------------------
 CORS_ALLOW_ALL_ORIGINS = True

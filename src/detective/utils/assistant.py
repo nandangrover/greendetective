@@ -38,7 +38,12 @@ class Assistant:
                 messages = [
                     {
                         "role": "user",
-                        "content": f"This is the raw data for the url: {url}. Return data in appropriate JSON structure: \n \n {knowledge}",
+                        "content": f"""This is the raw data for the url: {url}. Before processing any greenwashing claims, keep in mind what the company does.
+                        
+                        Company: Zevero
+                        Description: Zevero helps businesses measure, manage, and reduce their carbon emissions using an AI-enabled platform. Founded in 2021, they provide tools for sustainability compliance and insights, serving global customers across various industries. With offices in Singapore, London, and Japan, Zevero aims to prevent emissions and fight climate change.
+                        
+                        Return data in appropriate JSON structure: \n \n {knowledge}""",
                     }
                 ]
                 thread = self.create_thread(messages)
@@ -60,7 +65,7 @@ class Assistant:
         )
 
     def create_run(self, thread_id):
-        from detective.tasks import process_run
+        from detective.utils import start_processing_run
 
         run = self.client.threads.runs.create(
             thread_id=thread_id,
@@ -72,8 +77,8 @@ class Assistant:
             thread_oa_id=thread_id,
             staging=self.staging_data,
         )
-
-        process_run.delay(self.staging_data.uuid, run_instance.run_uuid)
+        
+        start_processing_run(self.staging_data.uuid, run_instance.run_uuid)
 
         return run_instance
 

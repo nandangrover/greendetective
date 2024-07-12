@@ -20,7 +20,7 @@ class Scraper:
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        
+
         self.logger = logging.getLogger(__name__)
 
     def get_all_links(self, url):
@@ -69,23 +69,27 @@ class Scraper:
             if self.urls_to_process:
                 # urls_to_process is array of urls to process, so we don't need to crawl the domain
                 for future in [
-                    executor.submit(self.scrape_content, url) for url in self.urls_to_process
+                    executor.submit(self.scrape_content, url)
+                    for url in self.urls_to_process
                 ]:
                     url, content = future.result()
                     if content:
                         self.save_to_staging(url, content)
-                        
+
                     time.sleep(1)
             else:
                 while len(self.to_visit) > 0:
                     new_links = set()
                     for future in [
-                        executor.submit(self.get_all_links, url) for url in self.to_visit
+                        executor.submit(self.get_all_links, url)
+                        for url in self.to_visit
                     ]:
                         new_links.update(future.result())
                     self.visited.update(self.to_visit)
                     self.to_visit = new_links - self.visited
-                    self.logger.info(f"Visited: {len(self.visited)}, To visit: {len(self.to_visit)}")
+                    self.logger.info(
+                        f"Visited: {len(self.visited)}, To visit: {len(self.to_visit)}"
+                    )
                     time.sleep(1)
 
                 for future in [

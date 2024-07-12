@@ -124,6 +124,8 @@ def _process_run_steps(assistant, thread_oa_id, staging_uuid, steps):
                 if isinstance(json_content, dict):
                     if "claims" in json_content:
                         json_content = json_content["claims"]
+                    elif "data" in json_content:
+                        json_content = json_content["data"]
                     else:
                         json_content = [json_content]
 
