@@ -1,10 +1,13 @@
 from django.db import models
+from detective.models import Company, Staging
 import uuid
 
 
 class RawStatistics(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    url = models.URLField(max_length=2048)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, default=None)
+    staging = models.ForeignKey(Staging, on_delete=models.DO_NOTHING, default=None)
+    claim = models.TextField(default=None)
     evaluation = models.TextField()
     score = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)

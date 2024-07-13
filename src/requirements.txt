@@ -54,3 +54,6 @@ vine==5.1.0
 watchdog==4.0.1
 watchtower==3.2.0
 wcwidth==0.2.13
+beautifulsoup4==4.12.3
+openai==1.35.10
+PyPDF2==3.0.1
