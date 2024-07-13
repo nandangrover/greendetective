@@ -37,6 +37,7 @@ class Scraper:
             .replace("\t", " ")
             .replace("\r", " ")
             .replace("|", " ")
+            .replace('\x00', '')  # Remove NUL characters
         )
         text_content = re.sub(r"\[[0-9]*\]", " ", text_content)
         text_content = re.sub(r"\s+", " ", text_content)
@@ -48,20 +49,21 @@ class Scraper:
         text_content = re.sub(r"\.+", ". ", text_content)
         text_content = (
             text_content.replace("?.", "?")
-            .replace("!.", "!")
+            .replace("!.", "!") 
             .replace(":.", ":")
             .replace("-.", "-")
         )
         text_content = text_content.strip()
         return text_content
+
     
-    def pdf_contains_images(self, file_path):
-        reader = pypdf.PdfReader(file_path, strict=True)
+    def pdf_contains_images(self, pdf_io_bytes):
+        reader = pypdf.PdfReader(pdf_io_bytes, strict=True)
         if len(reader.pages) <= 2:
             for i in range(len(reader.pages)):
                 page = reader.pages[i]
                 if '/XObject' in page['/Resources']:
-                    xObject = page['/Resources']['/XObject'].getObject()
+                    xObject = page['/Resources']['/XObject'].get_object()
                     for obj in xObject:
                         if xObject[obj]['/Subtype'] == '/Image':
                             error_name = "PDF is less than or equal to 2 pages and contains images"
@@ -70,6 +72,7 @@ class Scraper:
         else:
             self.logger.info("PDF has more than 2 pages")
         return False
+
 
     def get_all_links(self, url):
         try:
@@ -124,6 +127,13 @@ class Scraper:
     def scrape_pdf_content(self, url):
         try:
             response = requests.get(url, headers=self.headers)
+        
+            # Check if the content type is actually a PDF
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/pdf' not in content_type:
+                self.logger.error(f"Content at {url} is not a PDF. Skipping.")
+                return [(url, "")]
+
             pdf_io_bytes = io.BytesIO(response.content)
 
             if self.pdf_contains_images(pdf_io_bytes):
@@ -153,6 +163,7 @@ class Scraper:
         except Exception as e:
             self.logger.error(f"Failed to extract PDF content from {url}: {e}")
             return [(url, "")]
+
 
     def split_and_return_content(self, url, text):
         if len(text) <= self.max_content_length:
