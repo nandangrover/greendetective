@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from detective.models import Company, Report
 from detective.tasks import start_detective
+from utils import S3Client
 
 
 class TriggerDetectiveSerializer(serializers.Serializer):
@@ -13,9 +14,7 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         company_domain = validated_data.get("company_domain")
 
         # Check if company already exists
-        company = Company.objects.filter(
-            name=company_name, domain=company_domain
-        ).first()
+        company = Company.objects.filter(domain=company_domain).first()
 
         if not company:
             # Create new company if it doesn't exist
@@ -24,25 +23,31 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         return company
 
     def get_report_url(self, company, validated_data):
-        urls_to_process = validated_data.get("process_urls", [])
-        
-        # Filter report by only subset of urls (urls are stored as JSONField in Report model)
-        report = Report.objects.filter(company_id=company, urls__contains=urls_to_process).first()
-        
+        urls_to_process = validated_data.get("process_urls")
+
+        report = Report.objects.filter(company=company, urls=urls_to_process).first()
+
         user = self.context["request"].user
 
-        if report and not report.processing:
-            return report.uuid, report.s3_url, report.processing
+        if report:
+            presigned_url = S3Client().get_report_url(report=report.report_file.name)
+
+            if report.processing:
+                start_detective.delay(company.uuid, report.uuid)
+
+            return report.uuid, presigned_url, report.processing
         else:
             # Create a new report if it doesn't exist
             report = Report.objects.create(
                 company=company, user=user, urls=urls_to_process
             )
+            
+            presigned_url = S3Client().get_report_url(report="")
 
             # start background task to scrape the domain
             start_detective.delay(company.uuid, report.uuid)
 
-            return report.uuid, None, report.processing
+            return report.uuid, presigned_url, report.processing
 
     def validate(self, data):
         company_name = data.get("company_name")
@@ -55,7 +60,7 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         # domain should be a valid URL
         if not company_domain.startswith("https"):
             raise serializers.ValidationError("Invalid domain URL")
-        
+
         # Max 10 urls can be processed at a time
         if len(process_urls) > 20:
             raise serializers.ValidationError("Max 10 URLs can be processed at a time")

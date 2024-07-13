@@ -4,8 +4,7 @@ import time
 import logging
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-from detective.models import Staging
-from detective.models import Company
+from detective.models import Staging, Company
 import PyPDF2 as pypdf
 import io
 import re
@@ -55,6 +54,22 @@ class Scraper:
         )
         text_content = text_content.strip()
         return text_content
+    
+    def pdf_contains_images(self, file_path):
+        reader = pypdf.PdfReader(file_path, strict=True)
+        if len(reader.pages) <= 2:
+            for i in range(len(reader.pages)):
+                page = reader.pages[i]
+                if '/XObject' in page['/Resources']:
+                    xObject = page['/Resources']['/XObject'].getObject()
+                    for obj in xObject:
+                        if xObject[obj]['/Subtype'] == '/Image':
+                            error_name = "PDF is less than or equal to 2 pages and contains images"
+                            self.logger.warning(error_name)
+                            return True
+        else:
+            self.logger.info("PDF has more than 2 pages")
+        return False
 
     def get_all_links(self, url):
         try:
@@ -110,6 +125,11 @@ class Scraper:
         try:
             response = requests.get(url, headers=self.headers)
             pdf_io_bytes = io.BytesIO(response.content)
+
+            if self.pdf_contains_images(pdf_io_bytes):
+                self.logger.warning(f"PDF at {url} contains images and has 2 or fewer pages. Skipping.")
+                return [(url, "")]
+                
             text_list = []
             pdf = pypdf.PdfReader(pdf_io_bytes)
 

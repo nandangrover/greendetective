@@ -1,4 +1,26 @@
 services:
+  green-detective-localstack-s3:
+    container_name: green-detective-localstack-s3
+    image: localstack/localstack
+    environment:
+      - SERVICES=s3
+      - DATA_DIR=/tmp/localstack_data
+    volumes:
+      - ./s3_docker_mount:/tmp/localstack_data
+    ports:
+      - 4566:4566
+    networks:
+      - green-detective-localstack-s3
+  green-detective-s3-cli:
+    container_name: green-detective-s3-cli
+    image: amazon/aws-cli
+    depends_on:
+      - green-detective-localstack-s3
+    volumes:
+      - ./docker/aws:/root/.aws
+    entrypoint: "/root/.aws/create_s3_buckets.sh"
+    networks:
+      - green-detective-localstack-s3
   green-detective-postgresdb:
     container_name: green-detective-postgresdb
     image: postgres:13.3
@@ -42,3 +64,7 @@ networks:
   green-detective-redis:
     name: green-detective-redis
     driver: bridge
+  green-detective-localstack-s3:
+    name: green-detective-localstack-s3
+    driver: bridge
+  
