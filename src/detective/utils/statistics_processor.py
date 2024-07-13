@@ -1,4 +1,5 @@
 import logging
+import os
 import pandas as pd
 from detective.models import Report
 from datetime import datetime
@@ -95,11 +96,14 @@ class StatisticsProcessor:
         ).first()
 
         report.report_file.save(file_name, open(file_name, "rb"))
+        report.processing = False
+        report.save()
+        os.remove(file_name)
 
     def convert_to_excel(self, company_name, filename, stats, df):
         with pd.ExcelWriter(filename) as writer:
             df.to_excel(
-                writer, startrow=12, startcol=0, sheet_name="green_washing", index=False
+                writer, startrow=14, startcol=0, sheet_name="green_washing", index=False
             )
 
             worksheet = writer.sheets["green_washing"]
@@ -175,18 +179,18 @@ class StatisticsProcessor:
             )
 
             worksheet.merge_range(
-                7,
+                8,
                 0,
-                7,
+                8,
                 2,
                 f"Greenwashing Scale:",
                 heading_format,
             )
 
             worksheet.merge_range(
-                8,
+                9,
                 0,
-                8,
+                9,
                 2,
                 f"1 - 3: Low Greenwashing | 4 - 6: Moderate Greenwashing | 7 - 10: High Greenwashing",
                 standard_format,
@@ -198,8 +202,14 @@ class StatisticsProcessor:
                     .apply(lambda x: len(str(x) if x is not None else ""))
                     .max()
                 )
+                
+                text_length = max_length // 3
+                
+                if text_length > 20:
+                    text_length = 20
+                
                 column_length = max(
-                    max_length, len(str(column) if column is not None else "")
+                    text_length, len(str(column) if column is not None else "")
                 )
                 col_idx = df.columns.get_loc(column)
                 writer.sheets["green_washing"].set_column(
