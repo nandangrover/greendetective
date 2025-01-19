@@ -11,17 +11,26 @@ POLLING_MAX_SECONDS = 300
 POLL_INTERVAL = 2
 
 
-def start_processing_run(staging_uuid, run_uuid):
+def start_processing_run(staging_uuid, run_uuid, stat_uuid=None, pre_process=True):
     """
     Process run for a thread.
     """
 
     try:
-        _start_polling(staging_uuid, run_uuid, 0)
+        _start_polling(staging_uuid, run_uuid, stat_uuid, pre_process, 0)
     except Exception as e:
         run = Run.objects.get(run_uuid=run_uuid)
         _save_run_status(run, Run.STATUS_FAILED)
-        _save_staging_status(staging_uuid, Staging.STATUS_FAILED)
+        (
+            _save_staging_status(staging_uuid, Staging.STATUS_FAILED)
+            if pre_process
+            else None
+        )
+        (
+            _save_statistic_status(stat_uuid, RawStatistics.STATUS_FAILED)
+            if not pre_process
+            else None
+        )
 
         logger.error(
             f"Error while processing run for staging record: {staging_uuid}, run: {run_uuid}"
@@ -30,7 +39,7 @@ def start_processing_run(staging_uuid, run_uuid):
         logger.error(e)
 
 
-def _start_polling(staging_uuid, run_uuid, elapsed_time=0):
+def _start_polling(staging_uuid, run_uuid, stat_uuid, pre_process, elapsed_time=0):
     """
     Start polling for run status.
     """
@@ -47,7 +56,7 @@ def _start_polling(staging_uuid, run_uuid, elapsed_time=0):
     run_instance = Run.objects.get(run_uuid=run_uuid)
 
     logger.info(
-        f"Processing run for thread: {run_instance.thread_oa_id}, run: {run_instance.run_oa_id}"
+        f"Processing run for thread: {run_instance.thread_oa_id}, run: {run_instance.run_oa_id}, stat_uuid: {stat_uuid}"
     )
 
     # Retrieve thread and run information
@@ -64,35 +73,60 @@ def _start_polling(staging_uuid, run_uuid, elapsed_time=0):
         time.sleep(POLL_INTERVAL)
         elapsed_time += POLL_INTERVAL
 
-        _start_polling(staging_uuid, run_uuid, elapsed_time)
+        _start_polling(staging_uuid, run_uuid, stat_uuid, pre_process, elapsed_time)
 
     elif status == Run.STATUS_COMPLETED:
         # Check for new message in thread
         steps = assistant.list_run_steps(thread_oa_id, run_oa_id)
-        _process_run_steps(assistant, thread_oa_id, staging_uuid, steps)
+
+        if pre_process:
+            _process_pre_run_steps(assistant, thread_oa_id, staging_uuid, steps)
+        else:
+            _process_post_run_steps(assistant, thread_oa_id, stat_uuid, steps)
+
         _save_run_status(run_instance, Run.STATUS_COMPLETED)
 
     elif status in [Run.STATUS_FAILED, Run.STATUS_CANCELLED, Run.STATUS_EXPIRED]:
-        # Save run with appropriate status in db
+        (
+            _save_staging_status(staging_uuid, Staging.STATUS_FAILED)
+            if pre_process
+            else None
+        )
+        (
+            _save_statistic_status(stat_uuid, RawStatistics.STATUS_FAILED)
+            if not pre_process
+            else None
+        )
         _save_run_status(run_instance, status)
 
     else:
-        # Save run as failed in db (default case)
+        (
+            _save_staging_status(staging_uuid, Staging.STATUS_FAILED)
+            if pre_process
+            else None
+        )
+        (
+            _save_statistic_status(stat_uuid, RawStatistics.STATUS_FAILED)
+            if not pre_process
+            else None
+        )
         _save_run_status(run_instance, Run.STATUS_FAILED)
-
 
 def _save_run_status(run, status):
     run.status = status
     run.save()
-
 
 def _save_staging_status(staging_uuid, status):
     staging = Staging.objects.get(uuid=staging_uuid)
     staging.processed = status
     staging.save()
 
+def _save_statistic_status(stat_uuid, status):
+    raw_statistic = RawStatistics.objects.get(uuid=stat_uuid)
+    raw_statistic.processed = status
+    raw_statistic.save()
 
-def _process_run_steps(assistant, thread_oa_id, staging_uuid, steps):
+def _process_pre_run_steps(assistant, thread_oa_id, staging_uuid, steps):
     logger.info(f"Processing run steps for thread: {thread_oa_id}")
     # Get message_oa_id of all steps
     message_oa_ids = []
@@ -115,17 +149,17 @@ def _process_run_steps(assistant, thread_oa_id, staging_uuid, steps):
                 # convert text to dict
                 content = content.text.value
 
-                # print(content, "content yooo")
-
                 json_content = json.loads(content)
-
-                # if json_content is object, convert it to list
 
                 if isinstance(json_content, dict):
                     if "claims" in json_content:
                         json_content = json_content["claims"]
                     elif "data" in json_content:
                         json_content = json_content["data"]
+                    elif "results" in json_content:
+                        json_content = json_content["results"]
+                    elif "0" in json_content:
+                        json_content = json_content["0"]
                     else:
                         json_content = [json_content]
 
@@ -134,6 +168,57 @@ def _process_run_steps(assistant, thread_oa_id, staging_uuid, steps):
                     continue
 
                 _save_statistic(staging_uuid, json_content)
+
+
+def _process_post_run_steps(assistant, thread_oa_id, stat_uuid, steps):
+    logger.info(f"Processing run steps for thread: {thread_oa_id} - stat_uuid: {stat_uuid}")
+    # Get message_oa_id of all steps
+    message_oa_ids = []
+
+    for step in steps:
+        if step.step_details.type != "message_creation":
+            continue
+        message_id = step.step_details.message_creation.message_id
+        message_oa_ids.append(message_id)
+
+    # reverse the list to save the latest message last
+    message_oa_ids.reverse()
+
+    for message_oa_id in message_oa_ids:
+        message = assistant.retrieve_message(thread_oa_id, message_oa_id)
+
+        # Loop over content and save it in db
+        for content in message.content:
+            if content.type == "text":
+                # convert text to dict
+                content = content.text.value
+
+                json_content = json.loads(content)
+                
+                print("json_content", json_content)
+
+                if isinstance(json_content, dict):
+                    if (
+                        "evaluation" in json_content
+                        and json_content["evaluation"] == "False" or json_content["evaluation"] == False
+                    ):
+                        _defunct_raw_statistics(stat_uuid)
+
+                # if empty json_content, skip
+                if not json_content:
+                    continue
+
+    _save_statistic_status(stat_uuid, RawStatistics.STATUS_PROCESSED)
+
+def _defunct_raw_statistics(stat_uuid):
+    """
+    Defunct raw statistics.
+    """
+    print("defunct_raw_statistics herere", stat_uuid)
+    raw_statistic = RawStatistics.objects.get(uuid=stat_uuid)
+    raw_statistic.defunct = True
+
+    raw_statistic.save()
 
 
 def _save_statistic(staging_uuid, content):

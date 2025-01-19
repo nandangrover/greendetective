@@ -1,4 +1,4 @@
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -6,12 +6,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from .models import Company, Report
-from .serializers import UserSerializer, LoginSerializer, TriggerDetectiveSerializer
+from .serializers import (
+    UserSerializer,
+    LoginSerializer,
+    TriggerDetectiveSerializer,
+    ReportSerializer,
+)
 
 
 class SignupView(APIView):
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
@@ -30,16 +35,24 @@ class SignupView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            username = serializer.validated_data["username"] if "username" in serializer.validated_data else None
-            email = serializer.validated_data["email"] if "email" in serializer.validated_data else None
+            username = (
+                serializer.validated_data["username"]
+                if "username" in serializer.validated_data
+                else None
+            )
+            email = (
+                serializer.validated_data["email"]
+                if "email" in serializer.validated_data
+                else None
+            )
             password = serializer.validated_data["password"]
 
             user = self.authenticate(username=username, email=email, password=password)
-            
+
             if user:
                 refresh = RefreshToken.for_user(user)
                 return Response(
@@ -54,9 +67,8 @@ class LoginView(APIView):
                 {"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
-    def authenticate(self, username=None, email = None, password=None, **kwargs):
+
+    def authenticate(self, username=None, email=None, password=None, **kwargs):
         UserModel = get_user_model()
 
         try:
@@ -75,15 +87,30 @@ class LoginView(APIView):
 
 class TriggerDetectiveView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
-        
-        serializer = TriggerDetectiveSerializer(data=request.data, context={"request": request})
+
+        serializer = TriggerDetectiveSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             data = serializer.save()
             return Response(data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        
-        
-    
+
+
+class ReportListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportSerializer
+
+    def get_queryset(self):
+        return Report.objects.filter(user=self.request.user)
+
+
+class ReportDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportSerializer
+    lookup_field = "uuid"
+
+    def get_queryset(self):
+        return Report.objects.filter(user=self.request.user)

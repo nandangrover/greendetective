@@ -19,7 +19,7 @@ class Staging(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     url = models.URLField(max_length=2048)
-    raw_html = models.TextField()
+    raw = models.TextField()
     processed = models.CharField(max_length=255, choices=PROCESSED_STATUSES, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

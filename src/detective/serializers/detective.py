@@ -7,18 +7,24 @@ from utils import S3Client
 class TriggerDetectiveSerializer(serializers.Serializer):
     company_name = serializers.CharField(max_length=255)
     company_domain = serializers.URLField(max_length=200)
+    about_url = serializers.URLField(max_length=200, required=False)
     process_urls = serializers.ListField(child=serializers.URLField(), required=False)
 
     def create_or_get_company(self, validated_data):
         company_name = validated_data.get("company_name")
         company_domain = validated_data.get("company_domain")
+        about_url = validated_data.get("about_url", "")
 
         # Check if company already exists
         company = Company.objects.filter(domain=company_domain).first()
 
         if not company:
             # Create new company if it doesn't exist
-            company = Company.objects.create(name=company_name, domain=company_domain)
+            company = Company.objects.create(name=company_name, domain=company_domain, about_url=about_url)
+            
+        if company and not company.about_url and about_url:
+            company.about_url = about_url
+            company.save()
 
         return company
 

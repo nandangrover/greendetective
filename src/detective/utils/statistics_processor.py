@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from detective.models import Report
 from datetime import datetime
-from detective.models import RawStatistics, ProcessedStatistics, Staging
+from detective.models import Company, RawStatistics, Staging
 from django.db.models import Avg, StdDev
 from tailslide import Median, Percentile
 
@@ -14,8 +14,8 @@ class StatisticsProcessor:
 
         self.company_id = company_id
 
-    def process_raw_statistics(self):
-        from detective.tasks import trigger_assistant
+    def create_raw_statistics(self):
+        from detective.tasks import trigger_staging_assistant
 
         # get all staging uuids for a company from staging which have not been processed
         staging_data = Staging.objects.filter(
@@ -26,31 +26,45 @@ class StatisticsProcessor:
         for staging_uuid in staging_data:
             # Increase wait time for each staging record
             wait_time += 10
-            trigger_assistant.apply_async(args=[staging_uuid], countdown=wait_time)
-
-    def process_report(self):
-        # TODO: In the end, get all reports for this company with processing=True and add a s3 url for the generated report
+            trigger_staging_assistant.apply_async(args=[staging_uuid], countdown=wait_time)
+            
+            
+    def process_raw_statistics(self):
+        from detective.tasks import trigger_statistic_assistant
+        # Get all raw statistics for a company and then trigger assistant for each record
+        raw_statistics = RawStatistics.objects.filter(company_id=self.company_id, defunct=False, processed=RawStatistics.STATUS_PENDING).values_list("uuid", flat=True)
+        
+        wait_time = 0
+        for stat_uuid in raw_statistics:
+            wait_time += 10
+            trigger_statistic_assistant.apply_async(args=[stat_uuid], countdown=wait_time)
+    
+    def process_report_data(self):
+        urls = Staging.objects.filter(company_id=self.company_id).values_list(
+            "url", flat=True
+        )
 
         # Mean score, median score, and standard deviation of the scores
-        mean = RawStatistics.objects.filter(company_id=self.company_id).aggregate(
+        mean = RawStatistics.objects.filter(company_id=self.company_id, defunct=False).aggregate(
             Avg("score")
         )["score__avg"]
-        median = RawStatistics.objects.filter(company_id=self.company_id).aggregate(
+        median = RawStatistics.objects.filter(company_id=self.company_id, defunct=False).aggregate(
             Median("score")
         )["score__median"]
-        std_dev = RawStatistics.objects.filter(company_id=self.company_id).aggregate(
+        std_dev = RawStatistics.objects.filter(company_id=self.company_id, defunct=False).aggregate(
             StdDev("score")
         )["score__stddev"]
-        percentile = RawStatistics.objects.filter(company_id=self.company_id).aggregate(
+        percentile = RawStatistics.objects.filter(company_id=self.company_id, defunct=False).aggregate(
             Percentile("score", 0.9)
         )["score__percentile"]
+        unique_urls_count = len(set(urls))
 
-        print(
-            f"Mean: {mean}, Median: {median}, Std Dev: {std_dev}, 90th Percentile: {percentile}"
+        self.logger.info(
+            f"Mean: {mean}, Median: {median}, Standard Deviation: {std_dev}, 90th Percentile: {percentile}, Unique URLs: {unique_urls_count}"
         )
 
         company_stats = RawStatistics.objects.filter(
-            company_id=self.company_id
+            company_id=self.company_id, defunct=False
         ).order_by("-score")
 
         # Create a pandas dataframe with the above statistics
@@ -59,6 +73,7 @@ class StatisticsProcessor:
             "Median": median,
             "Standard Deviation": std_dev,
             "90th Percentile": percentile,
+            "Unique URLs": unique_urls_count,
         }
 
         # get score, claim, and evaluation for each record
@@ -81,9 +96,16 @@ class StatisticsProcessor:
         }
 
         df = pd.DataFrame(data)
+        
+        return stats, df
+    
+    def process_report(self):
+        stats, df = self.process_report_data()
+        
+        company = Company.objects.get(uuid=self.company_id)
 
         # company_name
-        company_name = company_stats[0].company.name
+        company_name = company.name
 
         file_name = (
             f"{company_name}_report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
@@ -179,18 +201,27 @@ class StatisticsProcessor:
             )
 
             worksheet.merge_range(
-                8,
+                7,
                 0,
-                8,
+                7,
                 2,
-                f"Greenwashing Scale:",
-                heading_format,
+                f"Unique URLs - {stats['Unique URLs']}",
+                standard_format,
             )
 
             worksheet.merge_range(
                 9,
                 0,
                 9,
+                2,
+                f"Greenwashing Scale:",
+                heading_format,
+            )
+
+            worksheet.merge_range(
+                10,
+                0,
+                10,
                 2,
                 f"1 - 3: Low Greenwashing | 4 - 6: Moderate Greenwashing | 7 - 10: High Greenwashing",
                 standard_format,
@@ -202,12 +233,12 @@ class StatisticsProcessor:
                     .apply(lambda x: len(str(x) if x is not None else ""))
                     .max()
                 )
-                
+
                 text_length = max_length // 3
-                
+
                 if text_length > 20:
                     text_length = 20
-                
+
                 column_length = max(
                     text_length, len(str(column) if column is not None else "")
                 )
