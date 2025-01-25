@@ -6,7 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'green_detective.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "green_detective.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -15,7 +15,7 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
-        
+
     is_testing = "test" in sys.argv
     with_coverage = "--without-coverage" not in sys.argv
 
@@ -37,5 +37,6 @@ def main():
         coverage_instance.html_report()
         coverage_instance.report()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

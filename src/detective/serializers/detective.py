@@ -2,6 +2,9 @@ from rest_framework import serializers
 from detective.models import Company, Report
 from detective.tasks import start_detective
 from utils import S3Client
+from datetime import timedelta
+from django.utils import timezone
+from detective.serializers.report import ReportSerializer
 
 
 class TriggerDetectiveSerializer(serializers.Serializer):
@@ -20,8 +23,10 @@ class TriggerDetectiveSerializer(serializers.Serializer):
 
         if not company:
             # Create new company if it doesn't exist
-            company = Company.objects.create(name=company_name, domain=company_domain, about_url=about_url)
-            
+            company = Company.objects.create(
+                name=company_name, domain=company_domain, about_url=about_url
+            )
+
         if company and not company.about_url and about_url:
             company.about_url = about_url
             company.save()
@@ -31,29 +36,35 @@ class TriggerDetectiveSerializer(serializers.Serializer):
     def get_report_url(self, company, validated_data):
         urls_to_process = validated_data.get("process_urls")
 
-        report = Report.objects.filter(company=company, urls=urls_to_process).first()
+        report = (
+            Report.objects.filter(company=company, urls=urls_to_process)
+            .order_by("-created_at")
+            .first()
+        )
 
         user = self.context["request"].user
 
-        if report:
+        # Return existing report if it exists and created within the last day
+        if report and report.created_at > timezone.now() - timedelta(days=1):
             presigned_url = S3Client().get_report_url(report=report.report_file.name)
-
-            if report.processing:
-                start_detective.delay(company.uuid, report.uuid)
-
-            return report.uuid, presigned_url, report.processing
-        else:
-            # Create a new report if it doesn't exist
-            report = Report.objects.create(
-                company=company, user=user, urls=urls_to_process
+            return (
+                report.uuid,
+                presigned_url,
+                report.status == Report.STATUS_PENDING
+                or report.status == Report.STATUS_PROCESSING,
             )
-            
+        else:
+            # Create a new report
+            report = Report.objects.create(
+                company=company, user=user, urls=urls_to_process, status=Report.STATUS_PENDING
+            )
+
             presigned_url = S3Client().get_report_url(report="")
 
             # start background task to scrape the domain
-            start_detective.delay(company.uuid, report.uuid)
+            start_detective.delay(str(company.uuid), str(report.uuid))
 
-            return report.uuid, presigned_url, report.processing
+            return report.uuid, presigned_url, True
 
     def validate(self, data):
         company_name = data.get("company_name")
@@ -67,9 +78,9 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         if not company_domain.startswith("https"):
             raise serializers.ValidationError("Invalid domain URL")
 
-        # Max 10 urls can be processed at a time
+        # Max 20 urls can be processed at a time
         if len(process_urls) > 20:
-            raise serializers.ValidationError("Max 10 URLs can be processed at a time")
+            raise serializers.ValidationError("Max 20 URLs can be processed at a time")
 
         return data
 
@@ -79,9 +90,13 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         company = self.create_or_get_company(validated_data)
         report_uuid, s3_url, processing = self.get_report_url(company, validated_data)
 
+        # Get report
+        report = Report.objects.get(uuid=report_uuid)
+
         return {
             "company": company.uuid,
             "report": report_uuid,
             "s3_url": s3_url,
             "processing": processing,
+            "status": report.status,
         }

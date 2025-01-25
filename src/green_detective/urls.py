@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 import os
 from django.contrib import admin
 from django.conf.urls.static import static
@@ -26,17 +27,15 @@ from drf_yasg import openapi
 from green_detective import settings
 
 
-
 v1_urlpatterns = [
-    path("zap/", admin.site.urls),
+    path("gap/", admin.site.urls),
     path("api/v1/detective/", include("detective.urls")),
-    path('api/v1/token', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/v1/token/refresh', TokenRefreshView.as_view(), name='token_refresh'),
+    path("api/v1/token", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/v1/token/refresh", TokenRefreshView.as_view(), name="token_refresh"),
     re_path(r"^static/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-urlpatterns = [
-]
+urlpatterns = []
 
 urlpatterns += v1_urlpatterns
 
@@ -69,4 +68,3 @@ documentation_urls = [
 
 if os.getenv("SERVER_ENVIRONMENT", None) == "local":
     urlpatterns += documentation_urls
-

@@ -1,0 +1,197 @@
+[tool.poetry]
+name = "green-detective"
+version = "0.1.0"
+description = ""
+authors = ["Green Detective <info@greendetective.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+amqp = "5.2.0"
+annotated-types = "0.7.0"
+anyio = "4.4.0"
+asgiref = "3.8.1"
+async-timeout = "4.0.3"
+beautifulsoup4 = "4.12.3"
+billiard = "4.2.0"
+boto3 = "1.34.127"
+botocore = "1.34.127"
+celery = "5.4.0"
+certifi = "2024.6.2"
+charset-normalizer = "3.3.2"
+click = "8.1.7"
+click-didyoumean = "0.3.1"
+click-plugins = "1.1.1"
+click-repl = "0.3.0"
+coverage = "7.5.3"
+cron-descriptor = "1.4.3"
+dill = "0.3.8"
+distro = "1.9.0"
+Django = "5.0.6"
+django-celery-beat = "2.6.0"
+django-celery-results = "2.5.1"
+django-cors-headers = "4.3.1"
+django-crontab = "0.7.1"
+django-redis = "5.4.0"
+django-storages = "1.14.4"
+django-timezone-field = "6.1.0"
+djangorestframework = "3.15.1"
+djangorestframework-simplejwt = "5.3.1"
+drf-yasg = "1.21.7"
+et-xmlfile = "1.1.0"
+exceptiongroup = "1.2.1"
+gunicorn = "22.0.0"
+h11 = "0.14.0"
+httpcore = "1.0.5"
+httpx = "0.27.0"
+idna = "3.7"
+inflection = "0.5.1"
+jmespath = "1.0.1"
+kombu = "5.3.7"
+multiprocess = "0.70.16"
+numpy = "1.26.4"
+openpyxl = "3.1.5"
+packaging = "24.1"
+pandas = "2.2.2"
+prompt_toolkit = "3.0.47"
+psycopg2-binary = "2.9.9"
+pydantic = "2.8.2"
+pydantic_core = "2.20.1"
+PyJWT = "2.8.0"
+python-crontab = "3.1.0"
+python-dateutil = "2.9.0.post0"
+python-dotenv = "1.0.1"
+pytz = "2024.1"
+PyYAML = "6.0.1"
+redis = "5.0.6"
+requests = "2.32.3"
+s3transfer = "0.10.1"
+six = "1.16.0"
+sniffio = "1.3.1"
+soupsieve = "2.5"
+sqlparse = "0.5.0"
+tailslide = "0.2.0"
+tqdm = "4.66.4"
+typing_extensions = "4.12.2"
+tzdata = "2024.1"
+uritemplate = "4.1.1"
+urllib3 = "2.2.1"
+vine = "5.1.0"
+watchdog = "4.0.1"
+watchtower = "3.2.0"
+wcwidth = "0.2.13"
+openai = "1.60.0"
+PyPDF2 = "3.0.1"
+XlsxWriter = "3.2.0"
+pgvector = "0.3.6"
+flower = "2.0.1"
+django_extensions = "3.2.3"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.0.0"
+poetry-plugin-export = "^1.8.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.black]
+line-length = 98
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # The following are specific to Black, you probably don't want those.
+  tests/data/
+  | profiling/
+  | scripts/generate_schema.py  # Uses match syntax
+)
+'''
+# We use the unstable style for formatting Black itself. If you
+# want bug-free formatting, you should keep this off. If you want
+# stable formatting across releases, you should also keep `preview = true`
+# (which is implied by this flag) off.
+unstable = false
+
+[tool.djlint]
+profile = "django"
+ignore = "H031"
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+# Same as Black.
+line-length = 98
+indent-width = 4
+
+target-version = "py310"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = ["F403", "F401"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = false
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"

@@ -35,7 +35,7 @@ class Completion:
                 {
                     "role": "user",
                     "content": self.message,
-                }
+                },
             ],
         )
 

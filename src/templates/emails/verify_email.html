@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify your email</title>
+</head>
+<body>
+    <h2>Welcome to Green Detective!</h2>
+    <p>Hi {{ user.username }},</p>
+    <p>Please verify your email address by clicking the link below:</p>
+    <p>
+        <a href="{{ verification_url }}">Verify Email Address</a>
+    </p>
+    <p>This link will expire in {{ expiry_days }} days.</p>
+    <p>If you didn't create this account, you can safely ignore this email.</p>
+</body>
+</html>

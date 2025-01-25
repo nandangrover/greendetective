@@ -23,7 +23,7 @@ services:
       - green-detective-localstack-s3
   green-detective-postgresdb:
     container_name: green-detective-postgresdb
-    image: postgres:13.3
+    image: ankane/pgvector:latest
     command: postgres -c 'max_connections=300'
     shm_size: 256m
     volumes:
@@ -57,6 +57,14 @@ services:
       timeout: 10s
       retries: 20
       start_period: 3s
+  green-detective-mailhog:
+    container_name: green-detective-mailhog
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web interface
+    networks:
+      - green-detective-service-api
 networks:
   green-detective-postgresdb:
     name: green-detective-postgresdb
@@ -67,4 +75,3 @@ networks:
   green-detective-localstack-s3:
     name: green-detective-localstack-s3
     driver: bridge
-  

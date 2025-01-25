@@ -14,15 +14,20 @@ WORKDIR ${WORKDIR}
 ADD ./src ${WORKDIR}
 ADD ./bootstrap ${BOOTSTRAP_DIR}
 
-# Install python dependencies
-RUN rm -rf ~/.cache/pip && \
-    pip install -r requirements.txt --no-cache-dir
-
 # Install essential packages
 RUN apt-get update && \
     apt-get install -y vim && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+# Install poetry
+RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python3 - && \
+    ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry && \
+    poetry config virtualenvs.create false
+
+# Install python dependencies
+RUN rm -rf ~/.cache/pip && \
+    poetry install --with dev
 
 FROM builder as builder-dev
 ENV APP_USER root
@@ -49,12 +54,12 @@ RUN apt-get update && \
     apt-get clean
 
 # Docker compose
-ARG DOCKER_COMPOSE_VERSION=2.24.2 
+ARG DOCKER_COMPOSE_VERSION=2.24.2
 RUN apt-get update && \
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
-    curl -SL "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose && \ 
-    chmod +x /usr/local/bin/docker-compose && \ 
-    ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose && \ 
+    curl -SL "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose && \
+    ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 

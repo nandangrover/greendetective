@@ -3,6 +3,7 @@ from django.db import models
 from detective.models import Staging
 from datetime import datetime, timezone
 
+
 class Run(models.Model):
     STATUS_QUEUED = "queued"
     STATUS_IN_PROGRESS = "in_progress"

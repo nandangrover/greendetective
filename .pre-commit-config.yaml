@@ -1,0 +1,75 @@
+exclude: ^(static/|templates|.*migrations/.*\.py)$
+
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        name: black
+        description: "Black: The uncompromising Python code formatter"
+        args:
+          - "--config"
+          - "./src/pyproject.toml"
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.8
+    hooks:
+      - id: ruff
+        args: [--fix, --no-unsafe-fixes]
+
+  - repo: https://github.com/python-poetry/poetry
+    rev: 1.8.3
+    hooks:
+      - id: poetry-check
+        args: ["-C", "./src"]
+      - id: poetry-lock
+        args: ["-C", "./src", "--no-update"]
+      - id: poetry-export
+        always_run: true
+        args: ["-C", "./src"]
+      - id: poetry-install
+        args: ["-C", "./src"]
+
+  - repo: https://github.com/python-poetry/poetry-plugin-export
+    rev: 1.8.0
+    hooks:
+      - id: poetry-export
+        stages:
+          - pre-push
+        always_run: true
+        args:
+          [
+            "-C",
+            "./src",
+            "-f",
+            "requirements.txt",
+            "-o",
+            "./src/requirements.txt",
+            "--without-hashes",
+          ]
+
+  - repo: local
+    hooks:
+      - id: sandbox-integration
+        name: Integrate Sandbox
+        stages:
+          - pre-push
+        entry: bash -c 'BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD); [[ "$SKIP_SANDBOX_INTEGRATION" != "true" && "$BRANCH_NAME" != *hotfix* && "$BRANCH_NAME" != *main* && "$BRANCH_NAME" != *test* ]] && git pull origin sandbox || echo "Skipping sandbox integration"'
+        language: system
+        always_run: true
+        types: [bash]
+      # - id: unit-tests
+      #   name: Unit Tests
+      #   stages:
+      #     - pre-push
+      #   entry: bash -c '[[ "$SKIP_UNIT_TESTS" != "true" ]] && docker exec emission-engine-service-api bash -c "python manage.py test --noinput" || (echo "Unit tests failed!" && exit 1)'
+      #   language: system
+      #   always_run: true
+      #   types: [bash]

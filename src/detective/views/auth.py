@@ -1,17 +1,10 @@
-from rest_framework import status, generics
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from django.db.models import Q
-from .models import Company, Report
-from .serializers import (
-    UserSerializer,
-    LoginSerializer,
-    TriggerDetectiveSerializer,
-    ReportSerializer,
-)
+from ..serializers import UserSerializer, LoginSerializer
 
 
 class SignupView(APIView):
@@ -83,34 +76,3 @@ class LoginView(APIView):
             # Run the default password hasher once to reduce the timing
             # difference between an existing and a non-existing user (#20760).
             UserModel().set_password(password)
-
-
-class TriggerDetectiveView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-
-        serializer = TriggerDetectiveSerializer(
-            data=request.data, context={"request": request}
-        )
-        if serializer.is_valid():
-            data = serializer.save()
-            return Response(data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ReportListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ReportSerializer
-
-    def get_queryset(self):
-        return Report.objects.filter(user=self.request.user)
-
-
-class ReportDetailView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ReportSerializer
-    lookup_field = "uuid"
-
-    def get_queryset(self):
-        return Report.objects.filter(user=self.request.user)

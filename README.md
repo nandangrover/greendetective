@@ -1,3 +1,87 @@
 # Green Detective
 
-Green Detective
+Green Detective is a Django-based web application that helps detect and analyze greenwashing claims made by companies. It uses AI-powered analysis to evaluate environmental claims and generate detailed reports.
+
+## Features
+
+- AI-powered analysis of company websites and documents
+- Greenwashing detection and scoring
+- Detailed report generation in Excel format
+- User authentication and invitation system
+- API-first architecture with Django REST Framework
+- Celery-based asynchronous task processing
+- Vector similarity search using pgvector
+- S3-compatible storage for reports
+
+## Tech Stack
+
+- Python 3.10
+- Django 5.0
+- Django REST Framework
+- Celery
+- PostgreSQL with pgvector
+- Redis
+- Docker & Docker Compose
+- OpenAI API
+- AWS S3 (or compatible storage)
+
+## How to setup
+
+### Docker
+
+1. Install [Docker](https://docs.docker.com/get-docker/)
+   - Make sure [buildkit](https://docs.docker.com/develop/develop-images/build_enhancements/#to-enable-buildkit-builds) is enabled
+2. Copy `src/.env.local.template` and pasted as `src/.env` (if not existed)
+3. Install pre-commit
+   ```shell
+   $ brew install pre-commit
+   ```
+4. Install pre-commit hooks
+   ```shell
+   $ pre-commit install --install-hooks
+   ```
+5. Build and run Docker
+   ```shell
+   $ docker-compose build
+   $ docker-compose up
+   ```
+
+## Services
+
+The application consists of several services:
+
+- **API Service**: Main Django application (port 9000)
+- **Process Service**: Celery worker for background tasks
+- **Flower**: Celery monitoring interface (port 5556)
+- **PostgreSQL**: Database (port 9500)
+- **Redis**: Message broker and caching (port 9379)
+- **LocalStack**: S3-compatible storage for local development (port 4566)
+- **MailHog**: Email testing interface (ports 1025, 8025)
+
+## Development Tools
+
+- Pre-commit hooks for code quality
+- Black for code formatting
+- Ruff for linting
+- Poetry for dependency management
+- Coverage.py for test coverage
+
+## Contributing
+
+1. Create a feature branch from `sandbox`
+2. Make your changes
+3. Run tests and ensure code quality:
+
+```bash
+docker exec green-detective-service-api python manage.py test
+```
+
+4. Submit a pull request
+
+## License
+
+MIT License - see the [LICENSE](LICENSE) file for details
+
+## Contact
+
+Please contact us at [info@greendetective.com](mailto:info@greendetective.com)

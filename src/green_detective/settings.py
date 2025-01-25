@@ -96,9 +96,17 @@ CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", 1800))
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_CACHE_BACKEND = "django-cache"
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER", os.getenv("REDIS_HOST"))
+
+# Enable task events for monitoring
+CELERY_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# Flower settings
+CELERY_FLOWER_USER = os.getenv("CELERY_FLOWER_USER", "admin")
+CELERY_FLOWER_PASSWORD = os.getenv("CELERY_FLOWER_PASSWORD", "admin")
+
 # TODO: Change schedule to run at 12am and 1pm everyday
-CELERY_BEAT_SCHEDULE = {
-}
+CELERY_BEAT_SCHEDULE = {}
 
 LOG_ROOT = os.path.join(BASE_DIR, "logs")
 boto3_logs_client = None
@@ -114,9 +122,7 @@ if IS_LOCAL is False:
 
 LOGGERS_COMMON = {
     "": {
-        "handlers": (
-            ["console", "file", "debug_file"] if IS_LOCAL is True else ["watchtower"]
-        ),
+        "handlers": (["console", "file", "debug_file"] if IS_LOCAL is True else ["watchtower"]),
         "level": "DEBUG" if DEBUG_LOG is True else "INFO",
     },
     "django": {
@@ -220,6 +226,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_extensions",
     "django_celery_results",
     "rest_framework",
     "rest_framework_simplejwt",
@@ -377,3 +384,20 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_LIFETIME_LATE_USER": timedelta(days=1),
     "SLIDING_TOKEN_LIFETIME_LATE_USER": timedelta(days=30),
 }
+
+# Email settings
+if SERVER_ENVIRONMENT == "local":
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = "green-detective-mailhog"
+    EMAIL_PORT = 1025
+    EMAIL_USE_TLS = False
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@detective.ai")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8001")

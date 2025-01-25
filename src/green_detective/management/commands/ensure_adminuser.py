@@ -21,9 +21,6 @@ class Command(BaseCommand):
             options["username"] = os.environ["DJANGO_SUPERUSER_USERNAME"]
             options["email"] = os.environ["DJANGO_SUPERUSER_EMAIL"]
             options["password"] = os.environ["DJANGO_SUPERUSER_PASSWORD"]
-            
-        # Create database green_detective if it doesn't exist
-        
 
         if not User.objects.filter(username=options["username"]).exists():
             User.objects.create_superuser(

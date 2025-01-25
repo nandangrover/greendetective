@@ -7,9 +7,7 @@ def get_emission_factor_response():
         openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "status": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="Status code"
-                ),
+                "status": openapi.Schema(type=openapi.TYPE_INTEGER, description="Status code"),
                 "data": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     description="Emission factor data",
@@ -26,9 +24,7 @@ def get_public_emission_factor_response():
         openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "status": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="Status code"
-                ),
+                "status": openapi.Schema(type=openapi.TYPE_INTEGER, description="Status code"),
                 "data": openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -59,18 +55,10 @@ def _emission_factor(public=False):
                 type=openapi.TYPE_STRING,
                 description="UUID of the main provider (only valid if calculation_level is 'P')",
             ),
-            "category": openapi.Schema(
-                type=openapi.TYPE_STRING, description="Category name"
-            ),
-            "name": openapi.Schema(
-                type=openapi.TYPE_STRING, description="Name of the item"
-            ),
-            "taxonomy": openapi.Schema(
-                type=openapi.TYPE_STRING, description="Taxonomy"
-            ),
-            "em_factor": openapi.Schema(
-                type=openapi.TYPE_NUMBER, description="Emission factor"
-            ),
+            "category": openapi.Schema(type=openapi.TYPE_STRING, description="Category name"),
+            "name": openapi.Schema(type=openapi.TYPE_STRING, description="Name of the item"),
+            "taxonomy": openapi.Schema(type=openapi.TYPE_STRING, description="Taxonomy"),
+            "em_factor": openapi.Schema(type=openapi.TYPE_NUMBER, description="Emission factor"),
             "average_weight": openapi.Schema(
                 type=openapi.TYPE_NUMBER, description="Average weight"
             ),
@@ -91,15 +79,9 @@ def _emission_factor(public=False):
                 type=openapi.TYPE_OBJECT,
                 description="Source",
                 properties={
-                    "link": openapi.Schema(
-                        type=openapi.TYPE_STRING, description="Link"
-                    ),
-                    "name": openapi.Schema(
-                        type=openapi.TYPE_STRING, description="Name"
-                    ),
-                    "year": openapi.Schema(
-                        type=openapi.TYPE_STRING, description="Year"
-                    ),
+                    "link": openapi.Schema(type=openapi.TYPE_STRING, description="Link"),
+                    "name": openapi.Schema(type=openapi.TYPE_STRING, description="Name"),
+                    "year": openapi.Schema(type=openapi.TYPE_STRING, description="Year"),
                 },
             ),
             "matching_meta": openapi.Schema(
@@ -124,9 +106,11 @@ def _emission_factor(public=False):
                     ),
                 },
             ),
-            "ghgp_category": openapi.Schema(
-                type=openapi.TYPE_STRING, description="GHGP category"
-            ) if public else None,
+            "ghgp_category": (
+                openapi.Schema(type=openapi.TYPE_STRING, description="GHGP category")
+                if public
+                else None
+            ),
             "ignored_parameters": openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 description="Ignored parameters",
@@ -155,9 +139,7 @@ def get_item_response():
         openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "status": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="Status code"
-                ),
+                "status": openapi.Schema(type=openapi.TYPE_INTEGER, description="Status code"),
                 "data": openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     description="Item data",
@@ -199,15 +181,9 @@ def get_item_response():
                                 type=openapi.TYPE_OBJECT,
                                 properties={
                                     "uuid": openapi.Schema(type=openapi.TYPE_STRING),
-                                    "ghgp_category": openapi.Schema(
-                                        type=openapi.TYPE_STRING
-                                    ),
-                                    "calculation_level": openapi.Schema(
-                                        type=openapi.TYPE_STRING
-                                    ),
-                                    "extra_attributes": openapi.Schema(
-                                        type=openapi.TYPE_OBJECT
-                                    ),
+                                    "ghgp_category": openapi.Schema(type=openapi.TYPE_STRING),
+                                    "calculation_level": openapi.Schema(type=openapi.TYPE_STRING),
+                                    "extra_attributes": openapi.Schema(type=openapi.TYPE_OBJECT),
                                     "reporting_approach": openapi.Schema(
                                         type=openapi.TYPE_STRING
                                     ),
@@ -224,9 +200,7 @@ def get_item_response():
                                         items=openapi.Items(
                                             type=openapi.TYPE_OBJECT,
                                             properties={
-                                                "uuid": openapi.Schema(
-                                                    type=openapi.TYPE_STRING
-                                                ),
+                                                "uuid": openapi.Schema(type=openapi.TYPE_STRING),
                                                 "category_name": openapi.Schema(
                                                     type=openapi.TYPE_STRING
                                                 ),
@@ -281,12 +255,8 @@ def get_item_response():
                                         items=openapi.Items(
                                             type=openapi.TYPE_OBJECT,
                                             properties={
-                                                "uuid": openapi.Schema(
-                                                    type=openapi.TYPE_STRING
-                                                ),
-                                                "name": openapi.Schema(
-                                                    type=openapi.TYPE_STRING
-                                                ),
+                                                "uuid": openapi.Schema(type=openapi.TYPE_STRING),
+                                                "name": openapi.Schema(type=openapi.TYPE_STRING),
                                                 "symbol": openapi.Schema(
                                                     type=openapi.TYPE_STRING
                                                 ),
@@ -302,9 +272,7 @@ def get_item_response():
                                         items=openapi.Items(
                                             type=openapi.TYPE_OBJECT,
                                             properties={
-                                                "uuid": openapi.Schema(
-                                                    type=openapi.TYPE_STRING
-                                                ),
+                                                "uuid": openapi.Schema(type=openapi.TYPE_STRING),
                                                 "address_line_1": openapi.Schema(
                                                     type=openapi.TYPE_STRING,
                                                     x_nullable=True,
@@ -351,15 +319,14 @@ def get_item_response():
         ),
     )
 
+
 def delete_item_response():
     return openapi.Response(
         "Delete item response",
         openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "status": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="Status code"
-                ),
+                "status": openapi.Schema(type=openapi.TYPE_INTEGER, description="Status code"),
                 "data": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="Delete item data",
@@ -367,15 +334,15 @@ def delete_item_response():
             },
         ),
     )
+
+
 def delete_provider_response():
     return openapi.Response(
         "Delete provider response",
         openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "status": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="Status code"
-                ),
+                "status": openapi.Schema(type=openapi.TYPE_INTEGER, description="Status code"),
                 "data": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="Delete provider data",

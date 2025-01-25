@@ -4,6 +4,9 @@ import logging
 import os
 from django.db import transaction
 from detective.models import Run, Staging, RawStatistics
+from detective.utils.scoring_rules import ClaimCategory, EvidenceStrength, ClaimImpact
+from detective.utils.run.pre import PreRunProcessor
+from detective.utils.run.post import PostRunProcessor
 
 
 class Assistant:
@@ -21,9 +24,7 @@ class Assistant:
         Initialize the ChatBase class.
         """
         self.staging_data = Staging.objects.get(uuid=staging_uuid)
-        self.stat_data = (
-            RawStatistics.objects.get(uuid=stat_uuid) if stat_uuid else None
-        )
+        self.stat_data = RawStatistics.objects.get(uuid=stat_uuid) if stat_uuid else None
         self.type = type
 
         open_ai_api_key = os.getenv("OPEN_AI_API_KEY", None)
@@ -39,6 +40,90 @@ class Assistant:
         self.logger.setLevel(log_level)
         self.logger.info("Initializing ChatBase...")
 
+    def _generate_scoring_guidelines(self):
+        """Generate scoring guidelines based on scoring rules"""
+        return f"""
+        Please analyze each environmental claim using the following structured format and criteria.
+        Provide your response in JSON format with detailed scoring for each claim:
+
+        1. Evidence Strength (0-3):
+           {self._format_enum_values(EvidenceStrength)}
+
+        2. Claim Impact (0-3):
+           {self._format_enum_values(ClaimImpact)}
+
+        3. Category Classification:
+           {self._format_enum_values(ClaimCategory)}
+
+        4. Time Relevance Scoring (0-1):
+           When exact dates aren't available, look for temporal indicators:
+           - Current/Ongoing initiatives: 0.8-1.0
+           - Recent past (within 1 year): 0.7-0.9
+           - Medium past (1-3 years): 0.4-0.6
+           - Older claims (3-5 years): 0.2-0.3
+           - No time reference: 0.1
+
+           Consider:
+           - Specific dates or years mentioned
+           - Words like "current", "ongoing", "recent"
+           - Future commitments and target dates
+           - Seasonal or quarterly references
+
+        5. Consistency Analysis (0-1):
+           Look for:
+           - Supporting claims that reinforce each other
+           - Contradicting statements or numbers
+           - Overlapping initiatives
+           - Progressive improvements over time
+
+           Score based on:
+           - Perfect alignment: 0.8-1.0
+           - Partial support: 0.6-0.8
+           - Neutral/Independent: 0.5
+           - Minor conflicts: 0.3-0.4
+           - Major contradictions: 0.0-0.2
+
+        Please structure your response in the following JSON format:
+
+        {{
+            "claims": [
+                {{
+                    "claim": "Full claim text",
+                    "category": "{' | '.join(cat.value for cat in ClaimCategory)}",
+                    "evidence_strength": {{
+                        "score": 0-3,
+                        "justification": "Detailed explanation of evidence rating"
+                    }},
+                    "impact": {{
+                        "score": 0-3,
+                        "justification": "Explanation of impact assessment"
+                    }},
+                    "time_relevance": {{
+                        "date": "YYYY-MM-DD or time period",
+                        "score": 0-1,
+                        "notes": "Time context explanation",
+                        "confidence": "high|medium|low"
+                    }},
+                    "consistency": {{
+                        "score": 0-1,
+                        "analysis": "Detailed consistency analysis",
+                        "related_claims": ["list", "of", "related", "claims"]
+                    }},
+                    "total_score": "Calculated total score",
+                    "evaluation": "Detailed evaluation of the claim",
+                    "recommendations": "Specific recommendations for improvement"
+                }}
+            ]
+        }}
+        """
+
+    def _format_enum_values(self, enum_class):
+        """Format enum values into readable guidelines"""
+        return "\n           ".join(
+            f'- {name} ({value.value}): {value.__doc__ if value.__doc__ else name.replace("_", " ").title()}'
+            for name, value in enum_class.__members__.items()
+        )
+
     def trigger_staging_run(self):
         """
         Trigger a run for a thread
@@ -46,23 +131,26 @@ class Assistant:
         try:
             with transaction.atomic():
                 if self.staging_data.processed == Staging.STATUS_PROCESSED:
-                    self.logger.info(
-                        f"Staging data already processed: {self.staging_data.uuid}"
-                    )
+                    self.logger.info(f"Staging data already processed: {self.staging_data.uuid}")
                     return
 
                 url = self.staging_data.url
                 knowledge = self.staging_data.raw
                 company = self.staging_data.company
-                # Create a thread
+
+                # Generate scoring guidelines from rules
+                scoring_guidelines = self._generate_scoring_guidelines()
+
                 messages = [
                     {
                         "role": "user",
                         "content": f"""This is the raw data for the url: {url}. Before processing any greenwashing claims, keep in mind what the company does.
-                        
+
                         Company: {company.name}
                         Description: {company.about_summary}
-                        
+
+                        {scoring_guidelines}
+
                         Raw data for processing: \n \n {knowledge}""",
                     }
                 ]
@@ -78,9 +166,8 @@ class Assistant:
 
     def trigger_statistic_run(self):
         """
-        Trigger a run for a thread
+        Trigger a run for a thread to analyze claim consistency and specificity
         """
-        # TODO: Need to attach file to the thread
         try:
             with transaction.atomic():
                 if self.staging_data.processed != Staging.STATUS_PROCESSED:
@@ -93,25 +180,110 @@ class Assistant:
                     return
 
                 raw = self.staging_data.url
-                claim = self.stat_data.claim
-                evaluation = self.stat_data.evaluation
-                # Create a thread
+                current_claim = self.stat_data.claim
+                current_evaluation = self.stat_data.evaluation
+                similar_claims = self.stat_data.find_similar_evaluations
+                company = self.staging_data.company
+
+                claim_analysis_guidelines = """
+                Please analyze if the current claim should be marked as defunct based on the following criteria:
+
+                1. Specificity Comparison:
+                   - More specific claims supersede general claims
+                   - Claims with concrete metrics/numbers are preferred over qualitative claims
+                   - Claims with verification methods or standards mentioned take precedence
+
+                2. Evidence Strength Hierarchy:
+                   a) Third-party verified claims with specific metrics
+                   b) Internal data with concrete numbers
+                   c) General sustainability statements
+                   d) Marketing claims without specifics
+
+                3. Claim Relationship Analysis:
+                   - SUPERSEDING: Newer claim provides more detail about the same topic
+                   - SUPPORTING: Claims that add complementary information
+                   - CONTRADICTING: Claims that present conflicting information
+                   - DUPLICATING: Multiple instances of the same claim
+
+                4. Defunct Criteria (Mark current claim as defunct if):
+                   - A more specific claim exists about the same topic
+                   - Another claim provides concrete metrics while current claim is qualitative
+                   - Another claim has stronger evidence/verification
+                   - Current claim is contradicted by more authoritative claims
+                   - Current claim is a subset of a more comprehensive claim
+
+                Please analyze the following claim against related claims and provide your response in this JSON format:
+
+                {{
+                    "evaluation": boolean,  // false if claim should be defunct
+                    "scoring": {{
+                        "claim": "Current claim text",
+                        "category": "environmental|social|governance|product|general",
+                        "relationship_analysis": {{
+                            "superseded_by": [
+                                {{
+                                    "claim": "text of superseding claim",
+                                    "reason": "Detailed explanation of why this claim supersedes"
+                                }}
+                            ],
+                            "supported_by": [
+                                {{
+                                    "claim": "text of supporting claim",
+                                    "reason": "How this claim provides support"
+                                }}
+                            ],
+                            "contradicted_by": [
+                                {{
+                                    "claim": "text of contradicting claim",
+                                    "reason": "Nature of contradiction"
+                                }}
+                            ]
+                        }},
+                        "specificity_comparison": {{
+                            "current_claim_metrics": ["list", "of", "metrics"],
+                            "related_claims_metrics": ["list", "of", "metrics"],
+                            "comparative_analysis": "Detailed analysis of specificity differences"
+                        }},
+                        "evidence_strength": {{
+                            "score": 0-3,
+                            "justification": "Analysis of evidence quality"
+                        }},
+                        "recommendation": "Detailed explanation of the decision"
+                    }}
+                }}
+
+                Example defunct case:
+                Current claim: "Our product is eco-friendly"
+                Related claim: "Our product reduces carbon footprint by 30% through sustainable materials, verified by Environmental Agency"
+                Decision: Mark as defunct because the related claim provides specific metrics and third-party verification.
+
+                Example valid case:
+                Current claim: "Our manufacturing reduces water usage by 40% through recycling"
+                Related claim: "We are committed to water conservation in our operations"
+                Decision: Keep current claim as it provides specific metrics to a general statement.
+                """
+
                 messages = [
                     {
                         "role": "user",
-                        "content": f"""
-                        Claim: {claim}
-                        
-                        Evaluation: {evaluation}
-                        
-                        Raw data: \n \n {raw}
+                        "content": f"""Analyze if this claim should be marked as defunct based on other claims from the same company.
+
+                        Company: {company.name}
+                        Description: {company.about_summary}
+                        URL: {raw}
+
+                        Current Claim: {current_claim}
+                        Current Evaluation: {current_evaluation}
+
+                        Related Claims and Evaluations:
+                        {similar_claims}
+
+                        {claim_analysis_guidelines}
                         """,
                     }
                 ]
                 thread = self.create_thread(messages)
-
                 self.create_run(thread.id)
-
                 self.logger.info(
                     f"Triggered run for thread: {thread.id} for statistic: {self.stat_data.uuid}"
                 )
@@ -125,13 +297,9 @@ class Assistant:
         Create a thread.
         """
         # TODO: Integrate file search
-        return self.client.threads.create(
-            messages=messages
-        )
+        return self.client.threads.create(messages=messages)
 
     def create_run(self, thread_id):
-        from detective.utils import start_processing_run
-
         run = self.client.threads.runs.create(
             thread_id=thread_id,
             assistant_id=self.assistant_id,
@@ -146,12 +314,12 @@ class Assistant:
         self.logger.info(f"Created run: {run.id}")
 
         (
-            start_processing_run(self.staging_data.uuid, run_instance.run_uuid)
+            self.start_processing_run(self.staging_data.uuid, run_instance.run_uuid)
             if self.type == self.ASSISTANT_TYPE_PRE
             else None
         )
         (
-            start_processing_run(
+            self.start_processing_run(
                 self.staging_data.uuid,
                 run_instance.run_uuid,
                 self.stat_data.uuid,
@@ -173,9 +341,7 @@ class Assistant:
         [File](https://platform.openai.com/docs/api-reference/files) to an
         [assistant](https://platform.openai.com/docs/api-reference/assistants).
         """
-        temp_json_file = NamedTemporaryFile(
-            delete=True, suffix=".csv", prefix=file_name
-        )
+        temp_json_file = NamedTemporaryFile(delete=True, suffix=".csv", prefix=file_name)
         data.to_csv(temp_json_file, sep="\t", index=False)
         file = self.open_ai.files.create(
             file=open(temp_json_file.name, "rb"), purpose="assistants"
@@ -216,6 +382,10 @@ class Assistant:
         """
         Retrieves a message.
         """
-        return self.client.threads.messages.retrieve(
-            thread_id=thread_id, message_id=message_id
-        )
+        return self.client.threads.messages.retrieve(thread_id=thread_id, message_id=message_id)
+
+    def start_processing_run(self, staging_uuid, run_uuid, stat_uuid=None, pre_process=True):
+        """Process run for a thread."""
+        processor_class = PreRunProcessor if pre_process else PostRunProcessor
+        processor = processor_class(staging_uuid, run_uuid, stat_uuid)
+        processor.start_processing()

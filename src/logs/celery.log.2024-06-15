@@ -1,280 +1,279 @@
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,388: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,388:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,388: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,388:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,389:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,390:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,391: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:56:53,391:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,191: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,191:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,192: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,192:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,192: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,192:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,193: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,193:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,193: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,193:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,194: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,194:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,195: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,195:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,195: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,195:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,196: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,196:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,196: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:57:51,196:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,628: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,628:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,630:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,631: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,631:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,631: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,631:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632: 
+[celery.utils.functional] [DEBUG] 2024-06-15 00:59:18,632:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,544: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,544:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,545:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,546:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,547: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,547:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,547: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:02,547:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,158: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,158:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,158: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,158:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,159:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,160:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,161: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:00:37,161:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,053: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,053:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,057: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,057:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,057: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,057:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,058: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,058:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,058: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,058:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,059: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,059:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,059: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,059:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,063: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,063:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,065: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,065:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,065: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:01:21,065:
 def chunks(task, it, n):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,031: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,031:
 def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,032: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,032:
 def backend_cleanup():
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033:
 def debug_task(self):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033:
 def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,033:
 def xmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034:
 def chain(*args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034:
 def xstarmap(task, it):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,034:
 def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,035: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,035:
 def accumulate(self, *args, **kwargs):
     return 1
 
-[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,035: 
+[celery.utils.functional] [DEBUG] 2024-06-15 01:04:00,035:
 def chunks(task, it, n):
     return 1
-

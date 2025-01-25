@@ -2,14 +2,13 @@ import requests
 import concurrent.futures
 import time
 import logging
-from datetime import timedelta, timezone
 from bs4 import BeautifulSoup
+from datetime import timedelta, timezone
 from urllib.parse import urljoin, urlparse
 from detective.models import Staging, Company
 import PyPDF2 as pypdf
 import io
 import re
-from django.utils import timezone
 
 
 class Scraper:
@@ -28,16 +27,20 @@ class Scraper:
         self.total_links_available = 0
 
         self.logger = logging.getLogger(__name__)
-        
+
     def scrape_about_section(self):
         try:
-            default_about_url = self.domain + "/about" if not self.domain.endswith("/") else self.domain + "about"
-            about_url = default_about_url if not self.company.about_url else self.company.about_url
-            
+            default_about_url = (
+                self.domain + "/about" if not self.domain.endswith("/") else self.domain + "about"
+            )
+            about_url = (
+                default_about_url if not self.company.about_url else self.company.about_url
+            )
+
             # Add http if not present
             if not about_url.startswith("http"):
                 about_url = "https://" + about_url
-            
+
             response = requests.get(about_url, headers=self.headers)
             soup = BeautifulSoup(response.content, "html.parser")
             texts = soup.stripped_strings
@@ -53,8 +56,7 @@ class Scraper:
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             if self.urls_to_process:
                 futures = [
-                    executor.submit(self._scrape_content, url)
-                    for url in self.urls_to_process
+                    executor.submit(self._scrape_content, url) for url in self.urls_to_process
                 ]
                 for future in concurrent.futures.as_completed(futures):
                     results = future.result()
@@ -65,10 +67,7 @@ class Scraper:
             else:
                 while self.to_visit and total_links_extracted < self.max_links:
                     new_links = set()
-                    futures = [
-                        executor.submit(self.get_all_links, url)
-                        for url in self.to_visit
-                    ]
+                    futures = [executor.submit(self.get_all_links, url) for url in self.to_visit]
                     for future in concurrent.futures.as_completed(futures):
                         links = future.result()
                         self.total_links_available += len(links)
@@ -78,9 +77,7 @@ class Scraper:
                     new_links = new_links - self.visited
 
                     if total_links_extracted + len(new_links) > self.max_links:
-                        new_links = set(
-                            list(new_links)[: self.max_links - total_links_extracted]
-                        )
+                        new_links = set(list(new_links)[: self.max_links - total_links_extracted])
 
                     self.to_visit = new_links
                     total_links_extracted += len(new_links)
@@ -100,7 +97,7 @@ class Scraper:
                         if content:
                             self._save_to_staging(url, content)
                     time.sleep(1)
-                    
+
     def _clean_content(self, raw_text):
         if raw_text is None or raw_text.strip() == "":
             return "No content found"
@@ -140,7 +137,9 @@ class Scraper:
                     xObject = page["/Resources"]["/XObject"].get_object()
                     for obj in xObject:
                         if xObject[obj]["/Subtype"] == "/Image":
-                            error_name = "PDF is less than or equal to 2 pages and contains images"
+                            error_name = (
+                                "PDF is less than or equal to 2 pages and contains images"
+                            )
                             self.logger.warning(error_name)
                             return True
         else:
@@ -160,11 +159,7 @@ class Scraper:
                     href = link["href"]
                     if href.startswith("/"):
                         href = urljoin(url, href)
-                    if (
-                        self.domain in href
-                        and href not in self.visited
-                        and "careers" not in href
-                    ):
+                    if self.domain in href and href not in self.visited and "careers" not in href:
                         links.add(href)
             elif "application/pdf" in content_type or url.endswith(".pdf"):
                 links.add(url)
@@ -182,14 +177,13 @@ class Scraper:
 
     def _scrape_content(self, url):
         url_exists = Staging.objects.filter(
-            url=url, 
-            created_at__gte=timezone.now() - timedelta(days=30)
+            url=url, created_at__gte=timezone.now() - timedelta(days=30)
         ).exists()
-        
+
         if url_exists:
             self.logger.info(f"Skipping {url} as it was scraped less than 1 month ago")
             return [(url, "")]
-        
+
         if url.endswith(".pdf"):
             return self._scrape_pdf_content(url)
         else:
@@ -271,4 +265,3 @@ class Scraper:
             self.logger.info(f"Saved to staging: {url}")
         except Exception as e:
             self.logger.error(f"Failed to save to staging: {e}")
-
