@@ -63,68 +63,130 @@ class PreRunProcessor(BaseRunProcessor):
 
         for claim_data in claims_data:
             try:
-                # Extract time relevance data, handling nested structure
+                # Time relevance processing
                 time_relevance = claim_data.get("time_relevance", {})
-                if isinstance(time_relevance, dict):
-                    time_date = time_relevance.get("date", "")
-                    time_notes = time_relevance.get("notes", "")
-                    time_confidence = time_relevance.get(
-                        "confidence", "low"
-                    )  # Get confidence from input if available
+                time_date = (
+                    time_relevance.get("date", "") if isinstance(time_relevance, dict) else ""
+                )
+                time_notes = (
+                    time_relevance.get("notes", "") if isinstance(time_relevance, dict) else ""
+                )
+                time_confidence = (
+                    time_relevance.get("confidence", "low")
+                    if isinstance(time_relevance, dict)
+                    else "low"
+                )
+
+                # Handle the case where time_relevance already has a score
+                if isinstance(time_relevance, dict) and "score" in time_relevance:
+                    time_score = float(time_relevance["score"])
+                    time_explanation = time_notes or "Time relevance from provided score"
                 else:
-                    time_date = ""
-                    time_notes = ""
+                    # Calculate time relevance if not provided
+                    time_result = scorer.calculate_time_relevance(time_date or time_notes)
+                    if isinstance(time_result, tuple):
+                        time_score, time_explanation = time_result
+                    else:
+                        time_score = float(time_result)
+                        time_explanation = "Time relevance calculated"
+
+                # Ensure time_confidence is set
+                if not time_confidence:
                     time_confidence = "low"
 
-                # Calculate time relevance score - handle both 2 and 3 return values
-                time_result = scorer.calculate_time_relevance(time_date or time_notes)
-                # Handle both return value formats
-                if isinstance(time_result, tuple):
-                    if len(time_result) == 3:
-                        time_score, time_explanation, time_confidence = time_result
-                    else:
-                        time_score, time_explanation = time_result
-                else:
-                    # Handle case where it returns a single score
-                    time_score = time_result
-                    time_explanation = "Time relevance calculated"
-
-                # Extract consistency data, handling nested structure
+                # Consistency processing
                 consistency_data = claim_data.get("consistency", {})
-                if isinstance(consistency_data, dict):
-                    related_claims = consistency_data.get("related_claims", [])
-                else:
-                    related_claims = []
-
-                # Calculate consistency score
-                consistency_score, consistency_explanation = scorer.calculate_consistency(
-                    claim_data.get("claim", ""), related_claims
+                related_claims = (
+                    consistency_data.get("related_claims", [])
+                    if isinstance(consistency_data, dict)
+                    else []
                 )
+
+                # Handle the case where consistency already has a score
+                if isinstance(consistency_data, dict) and "score" in consistency_data:
+                    consistency_score = float(consistency_data["score"])
+                    consistency_explanation = consistency_data.get(
+                        "analysis", "Consistency from provided score"
+                    )
+                else:
+                    # Calculate consistency if not provided
+                    consistency_result = scorer.calculate_consistency(
+                        claim_data.get("claim", ""), related_claims
+                    )
+                    consistency_score, consistency_explanation = consistency_result
 
                 # Extract evidence and impact data, handling nested structure
                 evidence_data = claim_data.get("evidence_strength", {})
                 if isinstance(evidence_data, dict):
-                    evidence_strength = evidence_data.get("score", "LOW")
+                    evidence_result = evidence_data.get("score", EvidenceStrength.WEAK)
+                    # Map numeric scores to enum values
+                    if isinstance(evidence_result, (int, float)):
+                        if evidence_result >= 3:
+                            evidence_strength = EvidenceStrength.STRONG
+                        elif evidence_result >= 2:
+                            evidence_strength = EvidenceStrength.MODERATE
+                        else:
+                            evidence_strength = EvidenceStrength.WEAK
+                    else:
+                        # If it's not a number, just use the default
+                        evidence_strength = EvidenceStrength.WEAK
                 else:
-                    evidence_strength = "LOW"
+                    evidence_strength = EvidenceStrength.WEAK
 
                 impact_data = claim_data.get("impact", {})
                 if isinstance(impact_data, dict):
-                    impact_score = impact_data.get("score", "LOW")
+                    impact_result = impact_data.get("score", ClaimImpact.LOW)
+                    # Map numeric scores to enum values
+                    if isinstance(impact_result, (int, float)):
+                        if impact_result >= 3:
+                            impact_score = ClaimImpact.HIGH
+                        elif impact_result >= 2:
+                            impact_score = ClaimImpact.MEDIUM
+                        else:
+                            impact_score = ClaimImpact.LOW
+                    else:
+                        # If it's not a number, just use the default
+                        impact_score = ClaimImpact.LOW
                 else:
-                    impact_score = "LOW"
+                    impact_score = ClaimImpact.LOW
 
                 # Create scoring criteria
-                criteria = ScoringCriteria(
-                    category=ClaimCategory(claim_data.get("category", "GENERAL")),
-                    evidence_strength=EvidenceStrength(evidence_strength),
-                    claim_impact=ClaimImpact(impact_score),
-                    time_relevance=time_score,
-                    consistency_score=consistency_score,
-                )
+                try:
+                    criteria = ScoringCriteria(
+                        category=ClaimCategory(claim_data.get("category", "GENERAL")),
+                        evidence_strength=evidence_strength,
+                        claim_impact=impact_score,
+                        time_relevance=time_score,
+                        consistency_score=consistency_score,
+                    )
+                except ValueError as ve:
+                    logger.error(f"Invalid scoring criteria values: {ve}")
+                    continue
 
                 # Calculate final score
-                score_details = scorer.calculate_score(criteria)
+                score_result = scorer.calculate_score(criteria)
+                if isinstance(score_result, dict):
+                    score_details = score_result
+                else:
+                    # If it returns a tuple or other format, construct the score details
+                    if isinstance(score_result, tuple):
+                        total_score = score_result[0]
+                        score_details = {
+                            "total_score": total_score,
+                            "evidence_score": criteria.evidence_strength.value,
+                            "impact_score": criteria.claim_impact.value,
+                            "time_score": criteria.time_relevance,
+                            "consistency_score": criteria.consistency_score,
+                        }
+                    else:
+                        total_score = float(score_result)
+                        score_details = {
+                            "total_score": total_score,
+                            "evidence_score": criteria.evidence_strength.value,
+                            "impact_score": criteria.claim_impact.value,
+                            "time_score": criteria.time_relevance,
+                            "consistency_score": criteria.consistency_score,
+                        }
 
                 processed_claim = {
                     "claim": claim_data.get("claim", ""),
@@ -172,6 +234,10 @@ class PreRunProcessor(BaseRunProcessor):
 
             for claim_data in processed_claims:
                 try:
+                    # Check if evaluation is empty
+                    if not claim_data.get("evaluation", "").strip():
+                        raise ValueError("Empty evaluation found in claim data")
+
                     stat_data = {
                         "evaluation": claim_data["evaluation"],
                         "score": claim_data["score"],

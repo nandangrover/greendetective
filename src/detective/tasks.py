@@ -148,7 +148,7 @@ def _save_company_about_section(company: Company, report: Report) -> None:
     Saves the company about section.
     """
     if not company.about_summary:
-        about_raw = Scraper(company.id, company.domain).scrape_about_section()
+        about_raw = Scraper(company.uuid, company.domain).scrape_about_section()
 
         if about_raw:
             rule = f"Given the company name {company.name}, the about section was scraped from the company's domain {company.domain}. Summarized the about section to provide a brief overview of the company. Summary should be less than 300 characters."
@@ -340,7 +340,7 @@ def trigger_staging_assistant(staging_uuid: str) -> None:
     logger.info("Assistant for staging finished")
 
 
-@shared_task(bind=True)
+@shared_task
 def process_company_statistics(company_id: int) -> Optional[bool]:
     """
     Process company statistics when all raw records are complete.

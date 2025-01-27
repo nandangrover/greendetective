@@ -1,5 +1,6 @@
 from rest_framework import status
-from django.http import HttpResponse
+from django.http import JsonResponse
+from django.db import connection
 
 
 class HealthCheckMiddleware:
@@ -8,5 +9,10 @@ class HealthCheckMiddleware:
 
     def __call__(self, request):
         if request.path == "/health-check":
-            return HttpResponse("ok", status=status.HTTP_200_OK)
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                return JsonResponse({"status": "ok"})
+            except Exception as e:
+                return JsonResponse({"status": "error", "message": str(e)}, status=500)
         return self.get_response(request)

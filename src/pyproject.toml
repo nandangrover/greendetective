@@ -85,6 +85,11 @@ XlsxWriter = "3.2.0"
 pgvector = "0.3.6"
 flower = "2.0.1"
 django_extensions = "3.2.3"
+sentry-sdk = "2.20.0"
+rq = "2.1.0"
+selenium = "4.28.1"
+tenacity = "9.0.0"
+ratelimit = "2.2.1"
 
 [tool.poetry.dev-dependencies]
 

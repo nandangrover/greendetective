@@ -3,12 +3,20 @@ import concurrent.futures
 import time
 import logging
 from bs4 import BeautifulSoup
-from datetime import timedelta, timezone
+from datetime import timedelta
+from django.utils import timezone
 from urllib.parse import urljoin, urlparse
 from detective.models import Staging, Company
 import PyPDF2 as pypdf
 import io
 import re
+from django.conf import settings
+from rq import Queue
+from tenacity import retry, stop_after_attempt, wait_exponential
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from ratelimit import limits, sleep_and_retry
+import random
 
 
 class Scraper:
@@ -25,8 +33,17 @@ class Scraper:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         self.total_links_available = 0
+        self.request_count = 0
+        self.last_request_time = time.time()
 
         self.logger = logging.getLogger(__name__)
+        self.redis = settings.REDIS_CONN
+        self.scrape_queue = Queue("scraping", connection=self.redis)
+
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            # Add more user agents here
+        ]
 
     def scrape_about_section(self):
         try:
@@ -148,46 +165,38 @@ class Scraper:
 
     def get_all_links(self, url):
         try:
-            response = requests.get(url, headers=self.headers)
-            content_type = response.headers.get("Content-Type", "")
+            response = requests.get(url, headers=self.headers, timeout=10)
+            soup = BeautifulSoup(response.content, "html.parser")
 
+            # Extract all links
             links = set()
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"]
 
-            if "text/html" in content_type:
-                soup = BeautifulSoup(response.content, "html.parser")
-                for link in soup.find_all("a", href=True):
-                    href = link["href"]
-                    if href.startswith("/"):
-                        href = urljoin(url, href)
-                    if self.domain in href and href not in self.visited and "careers" not in href:
-                        links.add(href)
-            elif "application/pdf" in content_type or url.endswith(".pdf"):
-                links.add(url)
-            else:
-                self.logger.warning(f"Skipping non-HTML and non-PDF content at {url}")
-                return set()
+                # Handle relative URLs
+                full_url = urljoin(url, href)
 
-            return links
-        except requests.RequestException as e:
-            self.logger.error(f"Request failed: {e}")
-            return set()
+                # Filter by domain and remove duplicates
+                if self.domain in full_url and full_url not in self.visited:
+                    links.add(full_url)
+
+            return list(links)
         except Exception as e:
-            self.logger.error(f"Failed to parse links from {url}: {e}")
-            return set()
+            self.logger.error(f"Error getting links from {url}: {e}")
+            return []
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _scrape_content(self, url):
-        url_exists = Staging.objects.filter(
-            url=url, created_at__gte=timezone.now() - timedelta(days=30)
-        ).exists()
-
-        if url_exists:
-            self.logger.info(f"Skipping {url} as it was scraped less than 1 month ago")
-            return [(url, "")]
-
-        if url.endswith(".pdf"):
-            return self._scrape_pdf_content(url)
-        else:
-            return self._scrape_html_content(url)
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+            soup = BeautifulSoup(response.content, "html.parser")
+            texts = soup.stripped_strings
+            content = " ".join(texts)
+            content = self._clean_content(content)
+            return self._split_and_return_content(url, content)
+        except Exception as e:
+            self.logger.error(f"Failed to scrape {url}: {e}")
+            raise
 
     def _scrape_html_content(self, url):
         try:
@@ -246,6 +255,21 @@ class Scraper:
             self.logger.error(f"Failed to extract PDF content from {url}: {e}")
             return [(url, "")]
 
+    def _scrape_js_content(self, url):
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+
+        driver = webdriver.Chrome(options=options)
+        try:
+            driver.get(url)
+            content = driver.page_source
+            soup = BeautifulSoup(content, "html.parser")
+            return self._extract_content(soup)
+        finally:
+            driver.quit()
+
     def _split_and_return_content(self, url, text):
         if len(text) <= self.max_content_length:
             return [(url, text)]
@@ -265,3 +289,17 @@ class Scraper:
             self.logger.info(f"Saved to staging: {url}")
         except Exception as e:
             self.logger.error(f"Failed to save to staging: {e}")
+
+    @sleep_and_retry
+    @limits(calls=10, period=1)  # 10 requests per second
+    def _make_request(self, url):
+        current_time = time.time()
+        if current_time - self.last_request_time < 0.1:  # 100ms between requests
+            time.sleep(0.1 - (current_time - self.last_request_time))
+        self.last_request_time = time.time()
+        headers = self.headers.copy()
+        headers["User-Agent"] = self._get_random_user_agent()
+        return requests.get(url, headers=headers, timeout=10)
+
+    def _get_random_user_agent(self):
+        return random.choice(self.user_agents)

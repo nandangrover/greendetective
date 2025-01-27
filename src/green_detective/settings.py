@@ -19,6 +19,9 @@ from .utils import to_bool
 from datetime import timedelta
 from urllib.parse import urlparse
 from celery.schedules import crontab
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+import redis
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -145,6 +148,16 @@ LOGGERS_BACKEND = {
 if to_bool(os.getenv("DJANGO_LOG_BACKEND", False)):
     LOGGERS_COMMON = {**LOGGERS_COMMON, **LOGGERS_BACKEND}
 
+# Add Sentry for error tracking
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+# Enhanced logging
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -155,6 +168,10 @@ LOGGING = {
         }
     },
     "handlers": {
+        "sentry": {
+            "level": "ERROR",
+            "class": "sentry_sdk.integrations.logging.EventHandler",
+        },
         "watchtower": (
             {
                 "level": "INFO",
@@ -212,7 +229,13 @@ LOGGING = {
             "filename": "{}/celery.log".format(LOG_ROOT),
         },
     },
-    "loggers": LOGGERS_COMMON,
+    "loggers": {
+        "": {
+            "handlers": ["sentry"],
+            "level": "ERROR",
+            "propagate": True,
+        },
+    },
 }
 
 # Application definition
@@ -375,6 +398,11 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {"anon": "100/hour", "user": "1000/hour"},
 }
 
 SIMPLE_JWT = {
@@ -401,3 +429,19 @@ else:
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@detective.ai")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8001")
+
+# # Add/update these security settings
+# SECURE_HSTS_SECONDS = 31536000  # 1 year
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+REDIS_CONN = redis.Redis(
+    host=os.getenv("REDIS_HOST", "redis"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=int(os.getenv("REDIS_DB", 0)),
+    decode_responses=True,
+)

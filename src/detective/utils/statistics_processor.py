@@ -48,7 +48,7 @@ class StatisticsProcessor:
             # Schedule completion check task
             check_staging_completion.apply_async(
                 args=[self.company_id],
-                countdown=wait_time + 300,  # Start checking 5 minutes after last task
+                countdown=wait_time + 5,  # Start checking 5 minutes after last task
             )
 
     def process_raw_statistics(self) -> None:
@@ -79,7 +79,7 @@ class StatisticsProcessor:
             # Schedule completion check task
             check_statistics_completion.apply_async(
                 args=[self.company_id],
-                countdown=wait_time + 300,  # Start checking 5 minutes after last task
+                countdown=wait_time + 5,  # Start checking 5 minutes after last task
             )
 
     def process_report_data(self) -> Tuple[dict, pd.DataFrame]:
@@ -196,6 +196,25 @@ class StatisticsProcessor:
     def _calculate_risk_metrics(self, stats) -> dict:
         """Calculates detailed risk metrics."""
         total_claims = len(stats)
+        if total_claims == 0:
+            return {
+                "High Risk Claims": {
+                    "count": 0,
+                    "percentage": 0,
+                    "threshold": "Score >= 7",
+                },
+                "Medium Risk Claims": {
+                    "count": 0,
+                    "percentage": 0,
+                    "threshold": "4 <= Score < 7",
+                },
+                "Low Risk Claims": {
+                    "count": 0,
+                    "percentage": 0,
+                    "threshold": "Score < 4",
+                },
+            }
+
         high_risk = sum(1 for stat in stats if stat.score >= 7)
         medium_risk = sum(1 for stat in stats if 4 <= stat.score < 7)
         low_risk = sum(1 for stat in stats if stat.score < 4)
@@ -440,24 +459,6 @@ class StatisticsProcessor:
                 1,
                 f"Percentage with Analysis: {insights['Consistency']['Percentage with Analysis']}%",
             )
-            row += 2
-
-            # Evidence Quality
-            justification_sheet.write(row, 0, "Evidence Quality", header_format)
-            row += 1
-            for evidence, count in stats["Justification Analysis"]["Evidence Quality"].items():
-                justification_sheet.write(row, 0, evidence)
-                justification_sheet.write(row, 1, str(count))
-                row += 1
-
-            # Impact Analysis
-            row += 2
-            justification_sheet.write(row, 0, "Impact Analysis", header_format)
-            row += 1
-            for impact, count in stats["Justification Analysis"]["Impact Analysis"].items():
-                justification_sheet.write(row, 0, impact)
-                justification_sheet.write(row, 1, str(count))
-                row += 1
 
             # Time Context
             row += 2
