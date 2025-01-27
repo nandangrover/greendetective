@@ -20,7 +20,7 @@ class BusinessSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    business = BusinessSerializer()
+    business = BusinessSerializer(required=False, allow_null=True)
 
     class Meta:
         model = UserProfile
@@ -34,7 +34,12 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("username", "email", "password", "profile", "invite_code")
-        extra_kwargs = {"password": {"write_only": True}}
+        extra_kwargs = {"password": {"write_only": True}, "email": {"required": True}}
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return value
 
     def validate_invite_code(self, value):
         try:
@@ -47,23 +52,26 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         invite_code = validated_data.pop("invite_code")
-        profile_data = validated_data.pop("profile")
-        business_data = profile_data.pop("business")
+        profile_data = validated_data.pop("profile", {})
+        business_data = profile_data.pop("business", None)
 
-        # Create business
-        business = Business.objects.create(**business_data)
-
-        # Create user
+        # Create user first
         user = User.objects.create_user(
             username=validated_data["username"],
             email=validated_data["email"],
             password=validated_data["password"],
         )
 
+        # Create business if data is provided
+        business = None
+        if business_data:
+            business = Business.objects.create(**business_data)
+
         # Update profile
-        user.profile.business = business
         user.profile.job_title = profile_data.get("job_title", "")
         user.profile.phone = profile_data.get("phone", "")
+        if business:
+            user.profile.business = business
         user.profile.save()
 
         # Mark invite code as used

@@ -1,6 +1,7 @@
 import os
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from detective.models import Business, UserProfile
 
 
 class Command(BaseCommand):
@@ -23,8 +24,29 @@ class Command(BaseCommand):
             options["password"] = os.environ["DJANGO_SUPERUSER_PASSWORD"]
 
         if not User.objects.filter(username=options["username"]).exists():
-            User.objects.create_superuser(
+            # Create admin user
+            user = User.objects.create_superuser(
                 username=options["username"],
                 email=options["email"],
                 password=options["password"],
+            )
+
+            # Create default business
+            business = Business.objects.create(
+                name="Admin Business",
+                website="https://admin.example.com",
+                industry="Technology",
+                size="1-10",
+            )
+
+            # Update user profile
+            profile = UserProfile.objects.get(user=user)
+            profile.business = business
+            profile.job_title = "Administrator"
+            profile.save()
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Successfully created admin user {options['username']} with default business"
+                )
             )

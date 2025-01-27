@@ -1,10 +1,10 @@
+import re
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, Dict
 from datetime import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
-import re
 
 
 class ClaimCategory(Enum):
@@ -16,21 +16,23 @@ class ClaimCategory(Enum):
 
 
 class EvidenceStrength(Enum):
-    STRONG = 3  # """Third-party verified claims with specific metrics, certifications, or independent audit reports"""
+    STRONG = 0  # """Third-party verified claims with specific metrics, certifications, or independent audit reports"""
     MODERATE = (
-        2  # """Internal data with partial verification, documented processes or methodologies"""
+        1  # """Internal data with partial verification, documented processes or methodologies"""
     )
-    WEAK = 1  # """Vague claims, marketing statements without substantial backing"""
-    NONE = 0  # """No supporting evidence or purely aspirational statements"""
+    WEAK = 2  # """Vague claims, marketing statements without substantial backing"""
+    NONE = 3  # """No supporting evidence or purely aspirational statements"""
+    MISLEADING = 4  # """Claims that appear deliberately vague or misleading"""
 
 
 class ClaimImpact(Enum):
-    HIGH = 3  # """Company-wide initiatives with measurable global/industry impact (e.g., Carbon neutral across all operations)"""
-    MEDIUM = 2  # """Significant but limited scope initiatives (e.g., 50% renewable energy in manufacturing)"""
+    HIGH = 0  # """Company-wide initiatives with measurable global/industry impact (e.g., Carbon neutral across all operations)"""
+    MEDIUM = 1  # """Significant but limited scope initiatives (e.g., 50% renewable energy in manufacturing)"""
     LOW = (
-        1  # """Small-scale or localized initiatives (e.g., Recycling program at headquarters)"""
+        2  # """Small-scale or localized initiatives (e.g., Recycling program at headquarters)"""
     )
-    MINIMAL = 0  # """Superficial or negligible impact on sustainability"""
+    MINIMAL = 3  # """Superficial or negligible impact on sustainability"""
+    DECEPTIVE = 4  # """Claims that overstate or misrepresent actual impact"""
 
 
 @dataclass
@@ -45,10 +47,10 @@ class ScoringCriteria:
 class GreenwashingScorer:
     def __init__(self):
         self.weights = {
-            "evidence_strength": 0.35,  # Highest weight for evidence quality
-            "claim_impact": 0.25,  # Second highest for actual impact
-            "time_relevance": 0.20,  # Moderate weight for timeliness
-            "consistency": 0.20,  # Equal weight for consistency
+            "evidence_strength": 1.75,  # (0-4) * 1.75 = 0-7 points
+            "claim_impact": 1.5,  # (0-4) * 1.5 = 0-6 points
+            "time_relevance": 0.75,  # (0-1) * 0.75 = 0-0.75 points
+            "consistency": 0.75,  # (0-1) * 0.75 = 0-0.75 points
         }
 
     def calculate_time_relevance(self, claim_date_or_text: str) -> tuple[float, str]:
@@ -114,32 +116,38 @@ class GreenwashingScorer:
             (r"\b(4|5|four|five) years ago\b", 0.2, "4-5 years ago"),
             # Future commitments (treated as current)
             (r"\b(will|plan|goal|target|commit|by 20\d\d)\b", 1.0, "Future commitment"),
-            # Specific year patterns
-            (
-                r"\b20\d\d\b",
-                lambda y: self._calculate_score_from_years(datetime.now().year - int(y.group())),
-            ),
-            # Recent/Latest patterns
-            (r"\b(recent|latest|newly)\b", 0.9, "Recent (unspecified)"),
-            # Past patterns with lower confidence
-            (r"\b(previously|formerly|past|earlier)\b", 0.3, "Past (unspecified)"),
         ]
 
         # Check each pattern
         for pattern, score, description in temporal_patterns:
             match = re.search(pattern, text)
             if match:
-                if callable(score):
-                    return score(match)
                 return score, description
 
+        # Handle year patterns separately to avoid tuple unpacking issues
+        year_pattern = r"\b20\d\d\b"
+        match = re.search(year_pattern, text)
+        if match:
+            years_ago = datetime.now().year - int(match.group())
+            return self._calculate_score_from_years(years_ago)
+
+        # Recent/Latest patterns
+        if re.search(r"\b(recent|latest|newly)\b", text):
+            return 0.9, "Recent (unspecified)"
+
+        # Past patterns with lower confidence
+        if re.search(r"\b(previously|formerly|past|earlier)\b", text):
+            return 0.3, "Past (unspecified)"
+
         # Look for season/quarter patterns
-        seasons = r"\b(spring|summer|fall|autumn|winter|q[1-4])\b"
-        if re.search(seasons, text):
+        if re.search(r"\b(spring|summer|fall|autumn|winter|q[1-4])\b", text):
             return 0.9, "Within last year (season/quarter mentioned)"
 
         # Default case - no clear temporal information
-        return 0.1, "Unclear timeframe - assuming relatively recent"
+        if "none" in text or not text.strip():
+            return 0.1, "No timeframe provided"
+
+        return 0.5, "Unclear timeframe - assuming ongoing"
 
     def calculate_consistency(self, claim: str, other_claims: List[str]) -> tuple[float, str]:
         """
@@ -220,23 +228,29 @@ class GreenwashingScorer:
 
     def calculate_score(self, criteria: ScoringCriteria) -> Dict:
         """
-        Calculate the final score based on all criteria
+        Calculate the final score based on all criteria and normalize to 0-10 scale
 
         Returns:
             Dict containing:
-            - total_score: Weighted average of all scores
+            - total_score: Weighted average of all scores (0-10)
             - Individual component scores
             - Category
         """
+        # Calculate raw component scores
         evidence_score = criteria.evidence_strength.value * self.weights["evidence_strength"]
         impact_score = criteria.claim_impact.value * self.weights["claim_impact"]
         time_score = criteria.time_relevance * self.weights["time_relevance"]
         consistency_score = criteria.consistency_score * self.weights["consistency"]
 
-        total_score = evidence_score + impact_score + time_score + consistency_score
+        # Calculate raw total (max possible is 14.5)
+        raw_total = evidence_score + impact_score + time_score + consistency_score
+
+        # Normalize to 0-10 scale
+        # 14.5 is the maximum possible score: (4 * 1.75) + (4 * 1.5) + (1 * 0.75) + (1 * 0.75)
+        normalized_total = min(10, (raw_total / 14.5) * 10)
 
         return {
-            "total_score": total_score,
+            "total_score": normalized_total,
             "evidence_score": evidence_score,
             "impact_score": impact_score,
             "time_score": time_score,

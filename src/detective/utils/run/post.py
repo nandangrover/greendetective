@@ -30,14 +30,14 @@ class PostRunProcessor(BaseRunProcessor):
                             raw_statistic = RawStatistics.objects.get(uuid=self.stat_uuid)
                             raw_statistic.comparison_analysis = json_content
 
-                            if "evaluation" in json_content and (
-                                json_content["evaluation"] == "False"
-                                or not json_content["evaluation"]
-                            ):
+                            if "defunct" in json_content and json_content["defunct"]:
                                 raw_statistic.defunct = True
                                 logger.info(
                                     f"Marked claim as defunct based on comparison analysis: {self.stat_uuid}"
                                 )
+                            else:
+                                raw_statistic.defunct = False
+                                logger.info(f"Claim marked as not defunct: {self.stat_uuid}")
 
                             raw_statistic.save()
                             logger.info(

@@ -1,11 +1,17 @@
 from rest_framework import serializers
-from detective.models import InviteCode
+from detective.models import InviteCode, InviteRequest
 from django.contrib.auth import get_user_model
+import re
 
 User = get_user_model()
 
 
 class UserBasicSerializer(serializers.ModelSerializer):
+    def validate_email(self, value):
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", value):
+            raise serializers.ValidationError("Invalid email address")
+        return value
+
     class Meta:
         model = User
         fields = ["id", "username", "email"]
@@ -49,3 +55,15 @@ class InviteCodeSerializer(serializers.ModelSerializer):
         if obj.expires_at and obj.expires_at < timezone.now():
             return False
         return True
+
+
+class InviteRequestSerializer(serializers.ModelSerializer):
+    def validate_email(self, value):
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", value):
+            raise serializers.ValidationError("Invalid email address")
+        return value
+
+    class Meta:
+        model = InviteRequest
+        fields = ["name", "email", "company_name"]
+        read_only_fields = ["status", "created_at", "updated_at"]

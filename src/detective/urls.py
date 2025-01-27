@@ -9,6 +9,7 @@ from .views import (
     InviteCodeViewSet,
     VerifyEmailView,
     ResendVerificationView,
+    InviteRequestView,
 )
 
 router = DefaultRouter()
@@ -18,7 +19,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path("signup/", SignupView.as_view(), name="signup"),
     path("login/", LoginView.as_view(), name="login"),
-    path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
+    path("verify-email/<str:token>/", VerifyEmailView.as_view(), name="verify-email"),
     path(
         "resend-verification/",
         ResendVerificationView.as_view(),
@@ -27,4 +28,5 @@ urlpatterns = [
     path("trigger_detective/", TriggerDetectiveView.as_view(), name="trigger_detective"),
     path("reports/", ReportListView.as_view(), name="report-list"),
     path("report/<uuid:uuid>/", ReportDetailView.as_view(), name="report-detail"),
+    path("request-invite/", InviteRequestView.as_view(), name="request-invite"),
 ]

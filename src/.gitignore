@@ -62,9 +62,6 @@ env.sh
 env
 logs/*
 
-#mediafiles
-media
-
 # Ignore vscode configs
 .vscode
 

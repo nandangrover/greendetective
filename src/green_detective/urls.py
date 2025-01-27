@@ -16,7 +16,6 @@ Including another URLconf
 """
 
 import os
-from django.contrib import admin
 from django.conf.urls.static import static
 from django.urls import include, path, re_path
 from django.views.static import serve
@@ -25,10 +24,11 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from green_detective import settings
+from detective.admin import admin_site
 
 
 v1_urlpatterns = [
-    path("gap/", admin.site.urls),
+    path("gap/", admin_site.urls),
     path("api/v1/detective/", include("detective.urls")),
     path("api/v1/token", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/v1/token/refresh", TokenRefreshView.as_view(), name="token_refresh"),
@@ -41,9 +41,9 @@ urlpatterns += v1_urlpatterns
 
 v1_schema_view = get_schema_view(
     openapi.Info(
-        title="Green Detective API",
+        title="GreenDetective API",
         default_version="v1",
-        description="API schema for Green Detective",
+        description="API schema for GreenDetective",
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="info@detective.ai"),
         license=openapi.License(name="BSD License"),

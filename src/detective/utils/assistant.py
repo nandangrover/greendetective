@@ -46,11 +46,13 @@ class Assistant:
         Please analyze each environmental claim using the following structured format and criteria.
         Provide your response in JSON format with detailed scoring for each claim:
 
-        1. Evidence Strength (0-3):
+        1. Evidence Strength (0-4, higher score = higher greenwashing risk):
            {self._format_enum_values(EvidenceStrength)}
+           Note: Higher scores indicate higher greenwashing risk. Vague marketing claims should receive high scores.
 
-        2. Claim Impact (0-3):
+        2. Claim Impact (0-4, higher score = higher greenwashing risk):
            {self._format_enum_values(ClaimImpact)}
+           Note: Higher scores indicate higher greenwashing risk. Claims that overstate or misrepresent impact should receive high scores.
 
         3. Category Classification:
            {self._format_enum_values(ClaimCategory)}
@@ -83,6 +85,14 @@ class Assistant:
            - Minor conflicts: 0.3-0.4
            - Major contradictions: 0.0-0.2
 
+        Important Scoring Notes:
+        - Higher scores indicate HIGHER greenwashing risk
+        - Vague marketing language should receive high evidence and impact scores
+        - Claims without specific metrics or verification should receive high scores
+        - Marketing slogans or broad statements should be scored as MISLEADING (4) for evidence
+        - Claims that overstate environmental impact should be scored as DECEPTIVE (4) for impact
+        - Example: "Curated for Earth Lovers" should receive high scores (MISLEADING evidence, DECEPTIVE impact) due to vague marketing language
+
         Please structure your response in the following JSON format:
 
         {{
@@ -91,11 +101,11 @@ class Assistant:
                     "claim": "Full claim text",
                     "category": "{' | '.join(cat.value for cat in ClaimCategory)}",
                     "evidence_strength": {{
-                        "score": 0-3,
+                        "score": 0-4,
                         "justification": "Detailed explanation of evidence rating"
                     }},
                     "impact": {{
-                        "score": 0-3,
+                        "score": 0-4,
                         "justification": "Explanation of impact assessment"
                     }},
                     "time_relevance": {{
@@ -109,7 +119,6 @@ class Assistant:
                         "analysis": "Detailed consistency analysis",
                         "related_claims": ["list", "of", "related", "claims"]
                     }},
-                    "total_score": "Calculated total score",
                     "evaluation": "Detailed evaluation of the claim",
                     "recommendations": "Specific recommendations for improvement"
                 }}
@@ -182,11 +191,17 @@ class Assistant:
                 raw = self.staging_data.url
                 current_claim = self.stat_data.claim
                 current_evaluation = self.stat_data.evaluation
-                similar_claims = self.stat_data.find_similar_evaluations
+                similar_claims, similar_evaluations = self.stat_data.find_similar_claims(limit=10)
                 company = self.staging_data.company
 
                 claim_analysis_guidelines = """
                 Please analyze if the current claim should be marked as defunct based on the following criteria:
+
+                Important Considerations:
+                - Preserve claims that might indicate potential greenwashing
+                - Keep claims that represent different aspects of sustainability
+                - Maintain claims that provide unique context or perspective
+                - Only mark as defunct when there is clear evidence of redundancy or supersession
 
                 1. Specificity Comparison:
                    - More specific claims supersede general claims
@@ -205,62 +220,69 @@ class Assistant:
                    - CONTRADICTING: Claims that present conflicting information
                    - DUPLICATING: Multiple instances of the same claim
 
-                4. Defunct Criteria (Mark current claim as defunct if):
-                   - A more specific claim exists about the same topic
-                   - Another claim provides concrete metrics while current claim is qualitative
-                   - Another claim has stronger evidence/verification
-                   - Current claim is contradicted by more authoritative claims
-                   - Current claim is a subset of a more comprehensive claim
+                4. Defunct Criteria (Mark current claim as defunct ONLY if):
+                   - A more specific claim exists about the same topic AND provides clear evidence of reduced greenwashing risk
+                   - Another claim provides concrete metrics while current claim is qualitative AND the metrics directly address greenwashing concerns
+                   - Another claim has stronger evidence/verification AND it clearly reduces greenwashing risk
+                   - Current claim is contradicted by more authoritative claims AND the contradiction reduces greenwashing risk
+                   - Current claim is a subset of a more comprehensive claim AND the comprehensive claim addresses greenwashing concerns
+
+                5. Keep Claim Criteria (Do NOT mark as defunct if):
+                   - The claim represents a unique aspect of sustainability
+                   - The claim provides context not found in other claims
+                   - The claim might indicate potential greenwashing
+                   - The claim is duplicated but appears in different contexts
+                   - The claim is qualitative but represents an important sustainability aspect
 
                 Please analyze the following claim against related claims and provide your response in this JSON format:
 
-                {{
-                    "evaluation": boolean,  // false if claim should be defunct
-                    "scoring": {{
+                {
+                    "defunct": boolean,  // true if claim should be marked as defunct
+                    "scoring": {
                         "claim": "Current claim text",
                         "category": "environmental|social|governance|product|general",
-                        "relationship_analysis": {{
+                        "relationship_analysis": {
                             "superseded_by": [
-                                {{
+                                {
                                     "claim": "text of superseding claim",
                                     "reason": "Detailed explanation of why this claim supersedes"
-                                }}
+                                }
                             ],
                             "supported_by": [
-                                {{
+                                {
                                     "claim": "text of supporting claim",
                                     "reason": "How this claim provides support"
-                                }}
+                                }
                             ],
                             "contradicted_by": [
-                                {{
+                                {
                                     "claim": "text of contradicting claim",
                                     "reason": "Nature of contradiction"
-                                }}
+                                }
                             ]
-                        }},
-                        "specificity_comparison": {{
+                        },
+                        "specificity_comparison": {
                             "current_claim_metrics": ["list", "of", "metrics"],
                             "related_claims_metrics": ["list", "of", "metrics"],
                             "comparative_analysis": "Detailed analysis of specificity differences"
-                        }},
-                        "evidence_strength": {{
+                        },
+                        "evidence_strength": {
                             "score": 0-3,
                             "justification": "Analysis of evidence quality"
-                        }},
+                        },
                         "recommendation": "Detailed explanation of the decision"
-                    }}
-                }}
+                    }
+                }
 
                 Example defunct case:
                 Current claim: "Our product is eco-friendly"
                 Related claim: "Our product reduces carbon footprint by 30% through sustainable materials, verified by Environmental Agency"
                 Decision: Mark as defunct because the related claim provides specific metrics and third-party verification.
 
-                Example valid case:
-                Current claim: "Our manufacturing reduces water usage by 40% through recycling"
-                Related claim: "We are committed to water conservation in our operations"
-                Decision: Keep current claim as it provides specific metrics to a general statement.
+                Example keep case:
+                Current claim: "We offer a wide range of sustainable products"
+                Related claim: "Our products are made from 100% recycled materials"
+                Decision: Keep current claim as it provides broader context about product range
                 """
 
                 messages = [
@@ -276,7 +298,8 @@ class Assistant:
                         Current Evaluation: {current_evaluation}
 
                         Related Claims and Evaluations:
-                        {similar_claims}
+                        Similar Claims: {similar_claims}
+                        Similar Evaluations: {similar_evaluations}
 
                         {claim_analysis_guidelines}
                         """,

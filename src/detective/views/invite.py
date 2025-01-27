@@ -5,9 +5,11 @@ from django.utils import timezone
 from datetime import timedelta
 import random
 import string
+from rest_framework import status
+from rest_framework.views import APIView
 
-from detective.models import InviteCode
-from detective.serializers.invite import InviteCodeSerializer
+from detective.models import InviteCode, InviteRequest
+from detective.serializers.invite import InviteCodeSerializer, InviteRequestSerializer
 
 
 def generate_invite_code(length=8):
@@ -38,3 +40,14 @@ class InviteCodeViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(invites, many=True)
         return Response(serializer.data)
+
+
+class InviteRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = InviteRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

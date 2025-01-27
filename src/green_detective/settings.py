@@ -92,13 +92,31 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [APP_URL]
 
 # Celery Configuration Options
-CELERY_TIMEZONE = "Europe/London"
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", 10800))
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", 14400))
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_CACHE_BACKEND = "django-cache"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", 1740))
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", 1800))
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_CACHE_BACKEND = "django-cache"
+CELERY_WORKER_PREFETCH_MULTIPLIER = os.environ.get("CELERY_WORKER_PREFETCH_MULTIPLIER", 1)
+CELERY_TASK_CREATE_MISSING_QUEUES = True
+CELERY_TASK_INHERIT_PARENT_PRIORITY = True
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER", os.getenv("REDIS_HOST"))
+
+# Queues
+CELERY_QUEUE_GENERAL = "gd_general"
+CELERY_QUEUE_SCRAPE = "gd_scrape"
+CELERY_QUEUE_PRE_STAGING = "gd_pre_staging"
+CELERY_QUEUE_POST_STAGING = "gd_post_staging"
+
+# Add these rate limits under the queue definitions
+CELERY_RATE_LIMIT_GENERAL = "10/s"
+CELERY_RATE_LIMIT_SCRAPE = "60/s"
+CELERY_RATE_LIMIT_PRE_STAGING = "40/s"
+CELERY_RATE_LIMIT_POST_STAGING = "40/s"
 
 # Enable task events for monitoring
 CELERY_SEND_TASK_EVENTS = True
@@ -289,7 +307,9 @@ ROOT_URLCONF = "green_detective.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            os.path.join(BASE_DIR, "templates"),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -428,7 +448,7 @@ else:
     EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@detective.ai")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8001")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # # Add/update these security settings
 # SECURE_HSTS_SECONDS = 31536000  # 1 year

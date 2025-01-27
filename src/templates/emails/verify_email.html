@@ -1,16 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Verify your email</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify your email - GreenDetective</title>
+    {% include "emails/_base_email_style.html" %}
 </head>
 <body>
-    <h2>Welcome to Green Detective!</h2>
-    <p>Hi {{ user.username }},</p>
-    <p>Please verify your email address by clicking the link below:</p>
-    <p>
-        <a href="{{ verification_url }}">Verify Email Address</a>
-    </p>
-    <p>This link will expire in {{ expiry_days }} days.</p>
-    <p>If you didn't create this account, you can safely ignore this email.</p>
+    <div class="email-container">
+        <div class="logo-container">
+            <img src="{{ APP_URL }}{{ MEDIA_URL }}/images/logo.png" alt="GreenDetective" class="logo">
+        </div>
+
+        <div class="header">
+            <h2>Verify your email address</h2>
+            <p>Welcome to GreenDetective! To get started with detecting greenwashing claims, please verify your email address.</p>
+        </div>
+
+        <a href="{{ verification_url }}" class="button">Verify Email Address</a>
+
+        <p>This verification link will expire in {{ expiry_days }} days.</p>
+
+        <div class="footer">
+            <p>If you didn't create this account, you can safely ignore this email.</p>
+            <p>&copy; {% now "Y" %} GreenDetective. All rights reserved.</p>
+        </div>
+    </div>
 </body>
 </html>

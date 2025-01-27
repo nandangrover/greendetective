@@ -5,7 +5,7 @@ import logging
 from bs4 import BeautifulSoup
 from datetime import timedelta
 from django.utils import timezone
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 from detective.models import Staging, Company
 import PyPDF2 as pypdf
 import io
@@ -17,9 +17,17 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from ratelimit import limits, sleep_and_retry
 import random
+import os
 
 
 class Scraper:
+    """
+    Scraper class for scraping a domain
+    """
+
+    MAX_LINKS = int(os.getenv("MAX_LINKS", "30000"))
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", "15000"))
+
     def __init__(self, company_id, start_url, urls_to_process=None):
         self.company = Company.objects.get(uuid=company_id)
         self.start_url = start_url
@@ -27,8 +35,8 @@ class Scraper:
         self.visited = set()
         self.to_visit = {start_url}
         self.urls_to_process = urls_to_process
-        self.max_links = 500
-        self.max_content_length = 15000  # Max characters per content part
+        self.max_links = self.MAX_LINKS
+        self.max_content_length = self.MAX_CONTENT_LENGTH
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
@@ -67,53 +75,6 @@ class Scraper:
         except requests.RequestException as e:
             self.logger.error(f"Request failed: {e}")
             return ""
-
-    def crawl_domain_and_save(self):
-        total_links_extracted = 0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            if self.urls_to_process:
-                futures = [
-                    executor.submit(self._scrape_content, url) for url in self.urls_to_process
-                ]
-                for future in concurrent.futures.as_completed(futures):
-                    results = future.result()
-                    for url, content in results:
-                        if content:
-                            self._save_to_staging(url, content)
-                    time.sleep(1)
-            else:
-                while self.to_visit and total_links_extracted < self.max_links:
-                    new_links = set()
-                    futures = [executor.submit(self.get_all_links, url) for url in self.to_visit]
-                    for future in concurrent.futures.as_completed(futures):
-                        links = future.result()
-                        self.total_links_available += len(links)
-                        new_links.update(links)
-
-                    self.visited.update(self.to_visit)
-                    new_links = new_links - self.visited
-
-                    if total_links_extracted + len(new_links) > self.max_links:
-                        new_links = set(list(new_links)[: self.max_links - total_links_extracted])
-
-                    self.to_visit = new_links
-                    total_links_extracted += len(new_links)
-                    self.logger.info(
-                        f"Visited: {len(self.visited)}, To visit: {len(self.to_visit)}, Total links extracted: {total_links_extracted}, Total links available: {self.total_links_available}"
-                    )
-
-                    time.sleep(1)
-
-                futures = [
-                    executor.submit(self._scrape_content, url)
-                    for url in list(self.visited)[: self.max_links]
-                ]
-                for future in concurrent.futures.as_completed(futures):
-                    results = future.result()
-                    for url, content in results:
-                        if content:
-                            self._save_to_staging(url, content)
-                    time.sleep(1)
 
     def _clean_content(self, raw_text):
         if raw_text is None or raw_text.strip() == "":
@@ -162,28 +123,6 @@ class Scraper:
         else:
             self.logger.info("PDF has more than 2 pages")
         return False
-
-    def get_all_links(self, url):
-        try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            soup = BeautifulSoup(response.content, "html.parser")
-
-            # Extract all links
-            links = set()
-            for a_tag in soup.find_all("a", href=True):
-                href = a_tag["href"]
-
-                # Handle relative URLs
-                full_url = urljoin(url, href)
-
-                # Filter by domain and remove duplicates
-                if self.domain in full_url and full_url not in self.visited:
-                    links.add(full_url)
-
-            return list(links)
-        except Exception as e:
-            self.logger.error(f"Error getting links from {url}: {e}")
-            return []
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _scrape_content(self, url):
@@ -303,3 +242,52 @@ class Scraper:
 
     def _get_random_user_agent(self):
         return random.choice(self.user_agents)
+
+    def _extract_links(self, content, base_url):
+        """
+        Extracts links from HTML content
+        """
+        try:
+            soup = BeautifulSoup(content, "html.parser")
+            links = set()
+
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"]
+                # Handle relative URLs
+                full_url = urljoin(base_url, href)
+
+                # Only include URLs that are part of the base domain
+                if self._is_same_domain(full_url):
+                    links.add(full_url)
+
+            return links
+        except Exception as e:
+            self.logger.error(f"Error extracting links from content: {e}")
+            return set()
+
+    def _is_same_domain(self, url):
+        """
+        Check if the URL belongs to the same domain as the start_url
+        """
+        try:
+            parsed_url = urlparse(url)
+            # Get base domain by removing www and splitting
+            base_domain_parts = self.domain.replace("www.", "").split(".")
+            url_domain_parts = parsed_url.netloc.replace("www.", "").split(".")
+
+            # Compare the last two parts of the domain (e.g., 'zevero.com')
+            return base_domain_parts[-2:] == url_domain_parts[-2:]
+        except Exception as e:
+            self.logger.error(f"Error checking domain for {url}: {e}")
+            return False
+
+    def _normalize_url(self, url):
+        """Normalize URL by removing fragments, sorting query parameters, etc."""
+        parsed = urlparse(url)
+        # Remove fragment and normalize path
+        normalized = parsed._replace(
+            fragment="",
+            path=parsed.path.rstrip("/"),
+            query="&".join(sorted(parsed.query.split("&"))) if parsed.query else "",
+        )
+        return urlunparse(normalized)

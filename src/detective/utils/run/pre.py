@@ -1,4 +1,5 @@
 import json
+import traceback
 import logging
 from detective.utils.run.base import BaseRunProcessor
 from detective.models import Staging, RawStatistics
@@ -58,139 +59,71 @@ class PreRunProcessor(BaseRunProcessor):
         return content_data if isinstance(content_data, list) else []
 
     def _process_claims_with_scoring(self, claims_data, scorer):
-        """Process claims with the new scoring system"""
+        """Process claims with fault-tolerant scoring system"""
         processed_claims = []
 
         for claim_data in claims_data:
             try:
-                # Time relevance processing
-                time_relevance = claim_data.get("time_relevance", {})
-                time_date = (
-                    time_relevance.get("date", "") if isinstance(time_relevance, dict) else ""
-                )
-                time_notes = (
-                    time_relevance.get("notes", "") if isinstance(time_relevance, dict) else ""
-                )
-                time_confidence = (
-                    time_relevance.get("confidence", "low")
-                    if isinstance(time_relevance, dict)
-                    else "low"
-                )
-
-                # Handle the case where time_relevance already has a score
-                if isinstance(time_relevance, dict) and "score" in time_relevance:
-                    time_score = float(time_relevance["score"])
-                    time_explanation = time_notes or "Time relevance from provided score"
-                else:
-                    # Calculate time relevance if not provided
-                    time_result = scorer.calculate_time_relevance(time_date or time_notes)
-                    if isinstance(time_result, tuple):
-                        time_score, time_explanation = time_result
-                    else:
-                        time_score = float(time_result)
-                        time_explanation = "Time relevance calculated"
-
-                # Ensure time_confidence is set
-                if not time_confidence:
-                    time_confidence = "low"
-
-                # Consistency processing
-                consistency_data = claim_data.get("consistency", {})
-                related_claims = (
-                    consistency_data.get("related_claims", [])
-                    if isinstance(consistency_data, dict)
-                    else []
-                )
-
-                # Handle the case where consistency already has a score
-                if isinstance(consistency_data, dict) and "score" in consistency_data:
-                    consistency_score = float(consistency_data["score"])
-                    consistency_explanation = consistency_data.get(
-                        "analysis", "Consistency from provided score"
-                    )
-                else:
-                    # Calculate consistency if not provided
-                    consistency_result = scorer.calculate_consistency(
-                        claim_data.get("claim", ""), related_claims
-                    )
-                    consistency_score, consistency_explanation = consistency_result
-
-                # Extract evidence and impact data, handling nested structure
-                evidence_data = claim_data.get("evidence_strength", {})
-                if isinstance(evidence_data, dict):
-                    evidence_result = evidence_data.get("score", EvidenceStrength.WEAK)
-                    # Map numeric scores to enum values
-                    if isinstance(evidence_result, (int, float)):
-                        if evidence_result >= 3:
-                            evidence_strength = EvidenceStrength.STRONG
-                        elif evidence_result >= 2:
-                            evidence_strength = EvidenceStrength.MODERATE
-                        else:
-                            evidence_strength = EvidenceStrength.WEAK
-                    else:
-                        # If it's not a number, just use the default
-                        evidence_strength = EvidenceStrength.WEAK
-                else:
-                    evidence_strength = EvidenceStrength.WEAK
-
-                impact_data = claim_data.get("impact", {})
-                if isinstance(impact_data, dict):
-                    impact_result = impact_data.get("score", ClaimImpact.LOW)
-                    # Map numeric scores to enum values
-                    if isinstance(impact_result, (int, float)):
-                        if impact_result >= 3:
-                            impact_score = ClaimImpact.HIGH
-                        elif impact_result >= 2:
-                            impact_score = ClaimImpact.MEDIUM
-                        else:
-                            impact_score = ClaimImpact.LOW
-                    else:
-                        # If it's not a number, just use the default
-                        impact_score = ClaimImpact.LOW
-                else:
-                    impact_score = ClaimImpact.LOW
-
-                # Create scoring criteria
-                try:
-                    criteria = ScoringCriteria(
-                        category=ClaimCategory(claim_data.get("category", "GENERAL")),
-                        evidence_strength=evidence_strength,
-                        claim_impact=impact_score,
-                        time_relevance=time_score,
-                        consistency_score=consistency_score,
-                    )
-                except ValueError as ve:
-                    logger.error(f"Invalid scoring criteria values: {ve}")
+                if not claim_data.get("claim"):
+                    logger.warning("Skipping claim with no claim text")
                     continue
 
-                # Calculate final score
-                score_result = scorer.calculate_score(criteria)
-                if isinstance(score_result, dict):
-                    score_details = score_result
+                # Extract evidence strength data with defaults
+                evidence_data = claim_data.get("evidence_strength", {})
+                if isinstance(evidence_data, (int, float)):
+                    evidence_strength = EvidenceStrength(min(int(evidence_data), 4))
                 else:
-                    # If it returns a tuple or other format, construct the score details
-                    if isinstance(score_result, tuple):
-                        total_score = score_result[0]
-                        score_details = {
-                            "total_score": total_score,
-                            "evidence_score": criteria.evidence_strength.value,
-                            "impact_score": criteria.claim_impact.value,
-                            "time_score": criteria.time_relevance,
-                            "consistency_score": criteria.consistency_score,
-                        }
-                    else:
-                        total_score = float(score_result)
-                        score_details = {
-                            "total_score": total_score,
-                            "evidence_score": criteria.evidence_strength.value,
-                            "impact_score": criteria.claim_impact.value,
-                            "time_score": criteria.time_relevance,
-                            "consistency_score": criteria.consistency_score,
-                        }
+                    evidence_score = evidence_data.get("score", 2)
+                    evidence_strength = EvidenceStrength(min(int(evidence_score), 4))
+
+                # Extract impact data with defaults
+                impact_data = claim_data.get("impact", {})
+                if isinstance(impact_data, (int, float)):
+                    claim_impact = ClaimImpact(min(int(impact_data), 4))
+                else:
+                    impact_score = impact_data.get("score", 2)
+                    claim_impact = ClaimImpact(min(int(impact_score), 4))
+
+                # Extract time relevance data with defaults
+                time_data = claim_data.get("time_relevance", {})
+                time_date = time_data.get("date", "Current/Ongoing")
+                time_score, time_explanation = scorer.calculate_time_relevance(time_date)
+                time_confidence = time_data.get("confidence", "medium")
+                time_notes = time_data.get("notes", "Timeframe inferred from context")
+
+                # Extract consistency data with defaults
+                consistency_data = claim_data.get("consistency", {})
+                if isinstance(consistency_data, (int, float)):
+                    consistency_score = float(consistency_data)
+                else:
+                    consistency_score = float(consistency_data.get("score", 0.5))
+                consistency_explanation = consistency_data.get(
+                    "analysis", "Consistency analysis not provided"
+                )
+                related_claims = consistency_data.get("related_claims", [])
+
+                # Determine category with default
+                category_str = claim_data.get("category", "general").upper()
+                try:
+                    category = ClaimCategory[category_str]
+                except (KeyError, ValueError):
+                    category = ClaimCategory.GENERAL
+
+                # Create scoring criteria
+                criteria = ScoringCriteria(
+                    category=category,
+                    evidence_strength=evidence_strength,
+                    claim_impact=claim_impact,
+                    time_relevance=time_score,
+                    consistency_score=consistency_score,
+                )
+
+                # Calculate final scores
+                score_details = scorer.calculate_score(criteria)
 
                 processed_claim = {
-                    "claim": claim_data.get("claim", ""),
-                    "evaluation": claim_data.get("evaluation", ""),
+                    "claim": claim_data["claim"],
+                    "evaluation": claim_data.get("evaluation", "No evaluation provided"),
                     "score": score_details["total_score"],
                     "score_breakdown": {
                         "evidence": score_details["evidence_score"],
@@ -198,10 +131,14 @@ class PreRunProcessor(BaseRunProcessor):
                         "time_relevance": score_details["time_score"],
                         "consistency": score_details["consistency_score"],
                     },
-                    "category": criteria.category.value,
+                    "category": score_details["category"],
                     "justification": {
-                        "evidence": evidence_data.get("justification", ""),
-                        "impact": impact_data.get("justification", ""),
+                        "evidence": evidence_data.get(
+                            "justification", "No evidence justification provided"
+                        ),
+                        "impact": impact_data.get(
+                            "justification", "No impact justification provided"
+                        ),
                         "time_context": {
                             "explanation": time_explanation,
                             "date": time_date,
@@ -211,16 +148,20 @@ class PreRunProcessor(BaseRunProcessor):
                         "consistency": {
                             "explanation": consistency_explanation,
                             "related_claims": related_claims,
-                            "analysis": consistency_data.get("analysis", ""),
+                            "analysis": consistency_data.get(
+                                "analysis", "No consistency analysis provided"
+                            ),
                         },
                     },
-                    "recommendations": claim_data.get("recommendations", ""),
+                    "recommendations": claim_data.get(
+                        "recommendations", "No specific recommendations provided"
+                    ),
                 }
 
                 processed_claims.append(processed_claim)
 
-            except Exception as e:
-                logger.error(f"Error processing claim: {e}")
+            except Exception:
+                logger.error(f"Error processing claim: {traceback.format_exc()}")
                 logger.error(f"Problematic claim data: {claim_data}")
                 continue
 

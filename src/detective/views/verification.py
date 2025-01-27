@@ -12,7 +12,6 @@ class VerifyEmailView(APIView):
 
     def post(self, request):
         token = request.data.get("token")
-
         verification = get_object_or_404(EmailVerificationToken, token=token)
 
         if not verification.is_valid:
