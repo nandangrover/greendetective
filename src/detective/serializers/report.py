@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from detective.models import Report, Staging, RawStatistics
 from utils import S3Client
+from detective.serializers.user import UserSerializer
 
 
 class ReportSerializer(serializers.ModelSerializer):
@@ -9,6 +10,7 @@ class ReportSerializer(serializers.ModelSerializer):
     company_domain = serializers.SerializerMethodField()
     eta_minutes = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = Report
@@ -22,7 +24,6 @@ class ReportSerializer(serializers.ModelSerializer):
             "processed",  # Keep for backwards compatibility
             "status",
             "status_display",
-            "report_file",
             "created_at",
             "updated_at",
             "s3_url",

@@ -25,6 +25,18 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
     ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry && \
     poetry config virtualenvs.create false
 
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg2 \
+    apt-transport-https \
+    ca-certificates \
+    chromium \
+    chromium-driver
+
+# Set Chrome binary location
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+
 # Install python dependencies
 RUN rm -rf ~/.cache/pip && \
     poetry install --with dev

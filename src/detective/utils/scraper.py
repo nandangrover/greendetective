@@ -18,6 +18,12 @@ from selenium.webdriver.chrome.options import Options
 from ratelimit import limits, sleep_and_retry
 import random
 import os
+import cloudscraper
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from random import choice
 
 
 class Scraper:
@@ -52,6 +58,29 @@ class Scraper:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             # Add more user agents here
         ]
+
+        # Initialize cloudscraper
+        self.scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}, delay=10
+        )
+
+        # Initialize undetected-chromedriver for JavaScript-heavy sites
+        self.driver = None
+
+        self.proxy_pool = []
+        self.current_proxy_index = 0
+        self._initialize_proxy_pool()
+
+    def _initialize_proxy_pool(self):
+        """Initialize a pool of proxies"""
+        # Add your proxy list here
+        proxy_list = [
+            {"username": "user1", "password": "pass1", "host": "proxy1.com", "port": "8080"},
+            {"username": "user2", "password": "pass2", "host": "proxy2.com", "port": "8080"},
+            # Add more proxies
+        ]
+
+        self.proxy_pool = proxy_list
 
     def scrape_about_section(self):
         try:
@@ -127,7 +156,8 @@ class Scraper:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _scrape_content(self, url):
         try:
-            response = requests.get(url, headers=self.headers, timeout=10)
+            proxies = self._get_proxy()
+            response = self.scraper.get(url, proxies=proxies)
             soup = BeautifulSoup(response.content, "html.parser")
             texts = soup.stripped_strings
             content = " ".join(texts)
@@ -229,16 +259,104 @@ class Scraper:
         except Exception as e:
             self.logger.error(f"Failed to save to staging: {e}")
 
-    @sleep_and_retry
-    @limits(calls=10, period=1)  # 10 requests per second
+    def _get_driver(self):
+        """Lazy initialization of the Chrome driver"""
+        if self.driver is None:
+            options = uc.ChromeOptions()
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-blink-features=AutomationControlled")
+
+            self.driver = uc.Chrome(options=options)
+            # Set page load timeout
+            self.driver.set_page_load_timeout(30)
+        return self.driver
+
     def _make_request(self, url):
-        current_time = time.time()
-        if current_time - self.last_request_time < 0.1:  # 100ms between requests
-            time.sleep(0.1 - (current_time - self.last_request_time))
-        self.last_request_time = time.time()
-        headers = self.headers.copy()
-        headers["User-Agent"] = self._get_random_user_agent()
-        return requests.get(url, headers=headers, timeout=10)
+        """Try different methods to bypass Cloudflare"""
+        methods = [self._try_cloudscraper, self._try_selenium, self._try_regular_request]
+
+        for method in methods:
+            try:
+                response = method(url)
+                if response and "Verifying your connection" not in response.text:
+                    return response
+                time.sleep(2)  # Wait between attempts
+            except Exception as e:
+                self.logger.warning(f"Method {method.__name__} failed for {url}: {e}")
+                continue
+
+        raise Exception("All bypass methods failed")
+
+    def _try_cloudscraper(self, url):
+        """Try using cloudscraper"""
+        proxies = self._get_proxy()
+        try:
+            return self.scraper.get(
+                url, timeout=30, allow_redirects=True, proxies=proxies if proxies else None
+            )
+        except Exception as e:
+            self.logger.error(f"Cloudscraper failed with proxy: {e}")
+            # Retry without proxy if proxy fails
+            if proxies:
+                return self.scraper.get(url, timeout=30, allow_redirects=True)
+            raise
+
+    def _try_selenium(self, url):
+        """Try using undetected-chromedriver"""
+        try:
+            driver = self._get_driver()
+            driver.get(url)
+
+            # Wait for page to load
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+            # Wait additional time if Cloudflare is detected
+            if "Verifying your connection" in driver.page_source:
+                time.sleep(5)
+
+            # Create a requests-like response object
+            class SeleniumResponse:
+                def __init__(self, driver):
+                    self.text = driver.page_source
+                    self.content = driver.page_source.encode("utf-8")
+                    self.status_code = 200
+
+            return SeleniumResponse(driver)
+        except Exception as e:
+            self.logger.error(f"Selenium request failed: {e}")
+            raise
+
+    def _try_regular_request(self, url):
+        """Fallback to regular requests with additional headers"""
+        headers = {
+            "User-Agent": self._get_random_user_agent(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "DNT": "1",
+        }
+
+        session = requests.Session()
+        return session.get(url, headers=headers, timeout=30, verify=False)
+
+    def __del__(self):
+        """Cleanup method"""
+        if self.driver:
+            try:
+                self.driver.quit()
+            except Exception as e:
+                self.logger.error(f"Error while quitting driver: {e}")
+                pass
 
     def _get_random_user_agent(self):
         return random.choice(self.user_agents)
@@ -249,16 +367,27 @@ class Scraper:
         """
         try:
             soup = BeautifulSoup(content, "html.parser")
-            links = set()
 
+            # Check for security check page
+            if soup.find(text=re.compile(r"Verifying your connection|Security check", re.I)):
+                self.logger.warning(f"Security check page detected for {base_url}")
+                return set()
+
+            links = set()
             for a_tag in soup.find_all("a", href=True):
                 href = a_tag["href"]
+                if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                    continue
+
                 # Handle relative URLs
                 full_url = urljoin(base_url, href)
 
                 # Only include URLs that are part of the base domain
                 if self._is_same_domain(full_url):
                     links.add(full_url)
+
+            if not links:
+                self.logger.warning(f"No links found in content from {base_url}")
 
             return links
         except Exception as e:
@@ -291,3 +420,39 @@ class Scraper:
             query="&".join(sorted(parsed.query.split("&"))) if parsed.query else "",
         )
         return urlunparse(normalized)
+
+    def _get_proxy(self):
+        """Get a free proxy from public proxy list"""
+        try:
+            # Get free proxy list
+            response = requests.get(
+                "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt"
+            )
+            proxies = response.text.split("\n")
+            working_proxies = []
+
+            # Test proxies (optional)
+            for proxy in proxies[:10]:  # Test first 10 only
+                if self._test_proxy(proxy.strip()):
+                    working_proxies.append(proxy.strip())
+
+            if working_proxies:
+                proxy = choice(working_proxies)
+                return {"http": f"http://{proxy}", "https": f"http://{proxy}"}
+        except Exception as e:
+            self.logger.error(f"Error getting proxy: {e}")
+
+        return None
+
+    def _test_proxy(self, proxy):
+        """Test if proxy is working"""
+        try:
+            requests.get(
+                "http://www.google.com",
+                proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"},
+                timeout=3,
+            )
+            return True
+        except requests.RequestException as e:
+            self.logger.debug(f"Proxy {proxy} failed: {e}")
+            return False

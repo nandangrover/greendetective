@@ -28,7 +28,9 @@ class Report(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    urls = ArrayField(models.URLField(max_length=2048), size=20, default=list)
+    urls = ArrayField(
+        models.URLField(max_length=2048), size=20, default=list, null=True, blank=True
+    )
     processed = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     report_file = models.FileField(

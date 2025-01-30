@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from detective.models import Company, Report
+from detective.models import Company, Report, UserProfile
 from detective.tasks import start_detective
 from utils import S3Client
 from datetime import timedelta
@@ -54,6 +54,8 @@ class TriggerDetectiveSerializer(serializers.Serializer):
                 or report.status == Report.STATUS_PROCESSING,
             )
         else:
+            if not urls_to_process:
+                urls_to_process = []
             # Create a new report
             report = Report.objects.create(
                 company=company, user=user, urls=urls_to_process, status=Report.STATUS_PENDING
@@ -70,6 +72,7 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         company_name = data.get("company_name")
         company_domain = data.get("company_domain")
         process_urls = data.get("process_urls", [])
+        user = self.context["request"].user
 
         if not company_name or not company_domain:
             raise serializers.ValidationError("Company name and domain are required")
@@ -82,10 +85,24 @@ class TriggerDetectiveSerializer(serializers.Serializer):
         if len(process_urls) > 20:
             raise serializers.ValidationError("Max 20 URLs can be processed at a time")
 
+        # Check if user's business can generate more reports
+        profile = UserProfile.objects.get(user=user)
+        if profile.business and not profile.business.can_generate_report():
+            raise serializers.ValidationError(
+                "Your business has reached its report limit for this plan"
+            )
+
         return data
 
     def save(self):
         validated_data = self.validated_data
+        user = self.context["request"].user
+        profile = UserProfile.objects.get(user=user)
+
+        if not profile.business.can_generate_report():
+            raise serializers.ValidationError(
+                "Your business has reached its report limit for this plan"
+            )
 
         company = self.create_or_get_company(validated_data)
         report_uuid, s3_url, processing = self.get_report_url(company, validated_data)

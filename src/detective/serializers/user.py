@@ -21,19 +21,29 @@ class BusinessSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     business = BusinessSerializer(required=False, allow_null=True)
+    job_title = serializers.CharField(source="profile.job_title")
+    phone = serializers.CharField(source="profile.phone")
 
     class Meta:
-        model = UserProfile
+        model = User
         fields = ("job_title", "phone", "business")
+
+    def to_representation(self, instance):
+        # If we're getting a UserProfile instance directly
+        if isinstance(instance, UserProfile):
+            return super().to_representation(instance.user)
+        # If we're getting a User instance
+        return super().to_representation(instance)
 
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer()
     invite_code = serializers.CharField(write_only=True)
+    business = BusinessSerializer(required=False, allow_null=True)
 
     class Meta:
         model = User
-        fields = ("username", "email", "password", "profile", "invite_code")
+        fields = ["id", "username", "email", "password", "profile", "invite_code", "business"]
         extra_kwargs = {"password": {"write_only": True}, "email": {"required": True}}
 
     def validate_email(self, value):

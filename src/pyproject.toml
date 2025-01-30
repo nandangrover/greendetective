@@ -87,9 +87,11 @@ flower = "2.0.1"
 django_extensions = "3.2.3"
 sentry-sdk = "2.20.0"
 rq = "2.1.0"
-selenium = "4.28.1"
 tenacity = "9.0.0"
 ratelimit = "2.2.1"
+cloudscraper = "1.2.71"
+undetected-chromedriver = "3.5.5"
+selenium = "4.28.1"
 
 [tool.poetry.dev-dependencies]
 

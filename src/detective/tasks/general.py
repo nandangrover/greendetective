@@ -30,12 +30,26 @@ def process_after_scraping(company_id: int, report_uuid: str) -> None:
         report = Report.objects.get(uuid=report_uuid)
 
         # Process URLs and continue with the pipeline
-        process_urls(company_id, company, report)
-        save_company_about_section(company, report)
-        process_report(company_id, company, report)
+        try:
+            process_urls(company_id, company, report)
+        except Exception as e:
+            logger.error(f"Error in process_urls: {str(e)}", exc_info=True)
+            raise
+
+        try:
+            save_company_about_section(company, report)
+        except Exception as e:
+            logger.error(f"Error in save_company_about_section: {str(e)}", exc_info=True)
+            raise
+
+        try:
+            process_report(company_id, company, report)
+        except Exception as e:
+            logger.error(f"Error in process_report: {str(e)}", exc_info=True)
+            raise
 
     except Exception as e:
-        logger.error(f"Error in post-scraping processing: {str(e)}")
+        logger.error(f"Error in post-scraping processing: {str(e)}", exc_info=True)
         # Update report status to failed on error
         Report.objects.filter(uuid=report_uuid).update(status=Report.STATUS_FAILED)
 
@@ -75,8 +89,17 @@ def start_detective(company_id: int, report_uuid: str) -> None:
 def check_staging_completion(company_id: int) -> None:
     """
     Check if all staging tasks are complete and trigger raw statistics processing.
+    After 2 retries, restarts the entire detective process.
     """
     logger.info("Checking staging completion")
+
+    # Get retry count from task request
+    retries = (
+        check_staging_completion.request.retries
+        if hasattr(check_staging_completion.request, "retries")
+        else 0
+    )
+
     pending_count = (
         Staging.objects.filter(company_id=company_id, defunct=False)
         .filter(Q(processed=Staging.STATUS_PENDING) | Q(processed=Staging.STATUS_PROCESSING))
@@ -84,8 +107,18 @@ def check_staging_completion(company_id: int) -> None:
     )
 
     if pending_count > 0:
-        # Still have pending tasks, check again in 5 minutes
-        check_staging_completion.apply_async(args=[company_id], countdown=300)
+        if retries >= 2:
+            # After 2 retries, restart the entire process
+            logger.warning(
+                f"Staging completion check failed after {retries} retries. Restarting detective process."
+            )
+            report = Report.objects.filter(company_id=company_id).latest("created_at")
+            start_detective.delay(company_id, str(report.uuid))
+        else:
+            # Still have pending tasks, check again in 5 minutes
+            check_staging_completion.apply_async(
+                args=[company_id], countdown=300, retries=retries + 1
+            )
     else:
         # All tasks complete, trigger next phase
         process_raw_statistics.delay(company_id)
@@ -97,8 +130,16 @@ def check_staging_completion(company_id: int) -> None:
 def check_statistics_completion(company_id: int) -> None:
     """
     Check if all statistics tasks are complete and trigger company statistics processing.
+    After 2 retries, restarts the entire detective process.
     """
     logger.info("Checking statistics completion")
+
+    # Get retry count from task request
+    retries = (
+        check_statistics_completion.request.retries
+        if hasattr(check_statistics_completion.request, "retries")
+        else 0
+    )
 
     pending_count = (
         RawStatistics.objects.filter(company_id=company_id, defunct=False)
@@ -110,8 +151,18 @@ def check_statistics_completion(company_id: int) -> None:
     )
 
     if pending_count > 0:
-        # Still have pending tasks, check again in 5 minutes
-        check_statistics_completion.apply_async(args=[company_id], countdown=300)
+        if retries >= 2:
+            # After 2 retries, restart the entire process
+            logger.warning(
+                f"Statistics completion check failed after {retries} retries. Restarting detective process."
+            )
+            report = Report.objects.filter(company_id=company_id).latest("created_at")
+            start_detective.delay(company_id, str(report.uuid))
+        else:
+            # Still have pending tasks, check again in 5 minutes
+            check_statistics_completion.apply_async(
+                args=[company_id], countdown=300, retries=retries + 1
+            )
     else:
         # All tasks complete, trigger final processing
         process_company_statistics.delay(company_id)

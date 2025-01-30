@@ -54,7 +54,7 @@ def scrape_domain(company_id: int, domain: str, report: Report, skip_scraping: b
 
     if not skip_scraping:
         scraping_tasks = []
-        if report.urls:
+        if report.urls and len(report.urls) > 0:
             # If specific URLs are provided, process them directly
             for url in report.urls:
                 scraping_tasks.append(scrape_single_url.s(company_id, url))
@@ -72,7 +72,8 @@ def process_urls(company_id: int, company: Company, report: Report) -> None:
     """
     Processes the URLs for the company and the report.
     """
-    urls_to_process = report.urls if len(report.urls) > 0 else None
+
+    urls_to_process = report.urls if report.urls and len(report.urls) > 0 else None
 
     # If urls_to_process is not empty, then mark all records apart from the ones in urls_to_process as defunct
     if urls_to_process:
@@ -85,7 +86,7 @@ def process_urls(company_id: int, company: Company, report: Report) -> None:
         # Mark all related raw statistics as defunct
         RawStatistics.objects.filter(staging__in=defunct_staging).update(defunct=True)
 
-        # Only mark records as pending if they haven't been updated in the last hour
+        # Only mark records as pending if they haven't been updated in the last day
         one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
         pending_staging = Staging.objects.filter(
             company_id=company_id,

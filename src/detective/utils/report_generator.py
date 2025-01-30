@@ -128,11 +128,19 @@ class ReportGenerator:
 
         # Formatting
         header_format = self.workbook.add_format(
-            {"bold": True, "font_size": 14, "bg_color": "#E6E6E6"}
+            {
+                "bold": True,
+                "font_size": 14,
+                "bg_color": "#E6E6E6",
+                "text_wrap": True,
+            }
         )
         summary_format = self.workbook.add_format(
             {"text_wrap": True, "valign": "top", "font_size": 12}
         )
+
+        # Set width for the first column
+        overview_sheet.set_column("A:A", 50)  # Set width to 50 characters
 
         # Write content
         row = 0
@@ -205,9 +213,16 @@ class ReportGenerator:
         row += 2
         overview_sheet.write(row, 0, "Recommendations", header_format)
         row += 1
-        for rec in self.stats["Recommendations Summary"]["Top Recommendations"]:
-            overview_sheet.write(row, 0, rec)
-            row += 1
+
+        overview_sheet.write(
+            row,
+            0,
+            self.stats["Recommendations Summary"]["Top Recommendations"]
+            .replace("\n", " ")
+            .strip(),
+            summary_format,
+        )
+        row += 1
 
         # Temporal Analysis
         row += 2
@@ -583,6 +598,150 @@ Each factor is scored individually and then combined to create the overall score
         }
 
     @staticmethod
+    def _analyze_justifications(stats) -> dict:
+        """Analyzes justifications and context data with enhanced metrics."""
+        justification_analysis = {
+            "Evidence Quality": ReportGenerator._analyze_evidence_justifications(stats),
+            "Impact Analysis": ReportGenerator._analyze_impact_justifications(stats),
+            "Time Context": ReportGenerator._analyze_time_context(stats),
+            "Consistency": ReportGenerator._analyze_consistency(stats),
+            "Key Insights": ReportGenerator._generate_justification_insights(stats),
+        }
+        return justification_analysis
+
+    @staticmethod
+    def _analyze_evidence_justifications(stats) -> dict:
+        """Analyzes evidence justifications."""
+        evidence_counts = {}
+        for stat in stats:
+            evidence = stat.justification.get("evidence", "").lower()
+            if evidence:
+                if evidence not in evidence_counts:
+                    evidence_counts[evidence] = 0
+                evidence_counts[evidence] += 1
+        return evidence_counts
+
+    @staticmethod
+    def _analyze_impact_justifications(stats) -> dict:
+        """Analyzes impact justifications."""
+        impact_counts = {}
+        for stat in stats:
+            impact = stat.justification.get("impact", "").lower()
+            if impact:
+                if impact not in impact_counts:
+                    impact_counts[impact] = 0
+                impact_counts[impact] += 1
+        return impact_counts
+
+    @staticmethod
+    def _analyze_time_context(stats) -> dict:
+        """Analyzes time context data."""
+        time_analysis = {
+            "date_present": sum(
+                1 for stat in stats if stat.justification.get("time_context", {}).get("date", "")
+            ),
+            "notes_present": sum(
+                1 for stat in stats if stat.justification.get("time_context", {}).get("notes", "")
+            ),
+            "confidence_levels": {
+                "high": sum(
+                    1
+                    for stat in stats
+                    if stat.justification.get("time_context", {}).get("confidence", "").lower()
+                    == "high"
+                ),
+                "medium": sum(
+                    1
+                    for stat in stats
+                    if stat.justification.get("time_context", {}).get("confidence", "").lower()
+                    == "medium"
+                ),
+                "low": sum(
+                    1
+                    for stat in stats
+                    if stat.justification.get("time_context", {}).get("confidence", "").lower()
+                    == "low"
+                ),
+            },
+        }
+        return time_analysis
+
+    @staticmethod
+    def _analyze_consistency(stats) -> dict:
+        """Analyzes consistency data."""
+        consistency_analysis = {
+            "related_claims_present": sum(
+                1
+                for stat in stats
+                if stat.justification.get("consistency", {}).get("related_claims", [])
+            ),
+            "analysis_present": sum(
+                1
+                for stat in stats
+                if stat.justification.get("consistency", {}).get("analysis", "")
+            ),
+        }
+        return consistency_analysis
+
+    @staticmethod
+    def _generate_justification_insights(stats) -> dict:
+        """Generates actionable insights from justification data."""
+        evidence_counts = ReportGenerator._analyze_evidence_justifications(stats)
+        impact_counts = ReportGenerator._analyze_impact_justifications(stats)
+        time_context = ReportGenerator._analyze_time_context(stats)
+        consistency = ReportGenerator._analyze_consistency(stats)
+
+        # Handle evidence quality insights
+        if evidence_counts:
+            sorted_evidence = sorted(evidence_counts.items(), key=lambda x: x[1])
+            # Ensure strongest and weakest are different
+            weakest = sorted_evidence[0][0]
+            strongest = sorted_evidence[-1][0]
+            if strongest == weakest and len(sorted_evidence) > 1:
+                strongest = sorted_evidence[-2][0]
+        else:
+            strongest = weakest = "N/A"
+
+        insights = {
+            "Evidence Quality": {
+                "Strongest Evidence": strongest,
+                "Weakest Evidence": weakest,
+            },
+            "Impact Analysis": {
+                "Most Common Impact": (
+                    max(impact_counts.items(), key=lambda x: x[1])[0] if impact_counts else "N/A"
+                ),
+                "Least Common Impact": (
+                    min(impact_counts.items(), key=lambda x: x[1])[0] if impact_counts else "N/A"
+                ),
+            },
+            "Time Context": {
+                "Most Common Confidence Level": (
+                    max(
+                        time_context["confidence_levels"].items(),
+                        key=lambda x: x[1],
+                    )[0]
+                    if time_context
+                    else "N/A"
+                )
+            },
+            "Consistency": {
+                "Percentage with Related Claims": (
+                    round(
+                        consistency["related_claims_present"] / len(stats) * 100,
+                        2,
+                    )
+                    if stats
+                    else 0
+                ),
+                "Percentage with Analysis": (
+                    round(consistency["analysis_present"] / len(stats) * 100, 2) if stats else 0
+                ),
+            },
+        }
+        return insights
+
+    @staticmethod
     def _get_risk_level(score: float) -> str:
         """Determines risk level based on score."""
         if score >= 7:
@@ -592,35 +751,69 @@ Each factor is scored individually and then combined to create the overall score
         return "Low Risk"
 
     @staticmethod
-    def _get_top_recommendations(recommendations: list) -> dict:
+    def _get_top_recommendations(recommendations: list) -> str:
         """
-        Analyzes and returns the most common recommendations.
+        Analyzes recommendations and generates an AI-powered summary paragraph.
+        Args:
+            recommendations: List of recommendation strings or lists of strings
+        Returns:
+            str: AI-generated summary paragraph of recommendations
         """
-        # Flatten list of recommendations if they're nested
+        # Flatten list of recommendations and handle potential None values
         flat_recommendations = []
-        for rec_list in recommendations:
-            if isinstance(rec_list, list):
-                flat_recommendations.extend(rec_list)
-            else:
-                flat_recommendations.append(rec_list)
+        for rec in recommendations:
+            if rec is None:
+                continue
+            if isinstance(rec, list):
+                flat_recommendations.extend(r for r in rec if r)
+            elif isinstance(rec, str):
+                flat_recommendations.append(rec)
 
         # Count occurrences of each recommendation
         recommendation_counts = {}
         for rec in flat_recommendations:
-            if rec:  # Skip empty recommendations
+            rec = rec.strip()
+            if rec:  # Skip empty strings
                 if rec not in recommendation_counts:
                     recommendation_counts[rec] = 0
                 recommendation_counts[rec] += 1
 
-        # Sort by frequency and get top 5
+        # Sort by frequency and get top 10
         sorted_recommendations = sorted(
-            recommendation_counts.items(), key=lambda x: x[1], reverse=True
-        )[:5]
+            recommendation_counts.items(),
+            key=lambda x: (-x[1], x[0]),  # Sort by count desc, then alphabetically
+        )[:10]
 
-        return {
-            "Most Common": dict(sorted_recommendations),
-            "Total Count": len(flat_recommendations),
-        }
+        # Create prompt for AI summary
+        recommendations_text = "\n".join([f"- {rec}" for rec, count in sorted_recommendations])
+        prompt = f"""
+        Analyze these top recommendations and generate a concise, professional summary paragraph:
+        {recommendations_text}
+
+        The summary should:
+        1. Group similar recommendations together
+        2. Highlight the most critical areas for improvement
+        3. Suggest actionable steps
+        4. Be written in professional business language
+        5. Be no more than 3-4 sentences
+        """
+
+        try:
+            from detective.utils.completion import Completion
+
+            completion = Completion(
+                message=prompt,
+                rule="You are a sustainability consultant creating recommendation summaries for greenwashing reports. Be professional and concise.",
+            )
+            # Clean up the AI response to remove newlines and extra spaces
+            ai_summary = completion.create_completion()
+            # Replace newlines with spaces and clean up extra spaces
+            return " ".join(ai_summary.split())
+        except Exception:
+            # Fallback to simple list if AI fails
+            return "Key Recommendations: " + ", ".join(
+                [rec for rec, count in sorted_recommendations]
+            )
 
     @staticmethod
     def _identify_priority_areas(stats) -> dict:

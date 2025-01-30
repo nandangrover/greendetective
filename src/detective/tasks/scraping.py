@@ -5,6 +5,7 @@ from detective.models import Staging
 import logging
 import time
 import requests
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +105,19 @@ def crawl_domain(company_id: int, start_url: str) -> None:
 
         for url in to_visit:
             try:
-                response = requests.get(url, headers=scraper.headers, timeout=10)
-                # Normalize URLs before adding to new_links
-                extracted_links = scraper._extract_links(response.content, url)
-                normalized_links = {scraper._normalize_url(link) for link in extracted_links}
-                new_links.update(normalized_links)
+                # Add delay between requests
+                time.sleep(random.uniform(2, 5))  # Increased delay
+
+                response = scraper._make_request(url)
+                if response.status_code == 200:
+                    # Extract links from the response
+                    extracted_links = scraper._extract_links(response.content, url)
+                    if not extracted_links:
+                        logger.warning(f"No links extracted from {url}")
+                    normalized_links = {scraper._normalize_url(link) for link in extracted_links}
+                    new_links.update(normalized_links)
+                else:
+                    logger.warning(f"Got status code {response.status_code} for {url}")
             except Exception as e:
                 logger.error(f"Error getting links from {url}: {e}")
                 continue

@@ -6,3 +6,4 @@ from .run import Run
 from .business import Business, InviteCode, InviteRequest
 from .profile import UserProfile
 from .verification import EmailVerificationToken
+from .glossary import SustainabilityGlossary

@@ -28,6 +28,9 @@ class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
 
+    def get_object(self):
+        return Report.objects.get(uuid=self.kwargs["uuid"])
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -42,7 +45,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=["get"])
-    def status(self, request, pk=None):
+    def status(self, request, uuid=None):
         report = self.get_object()
         return Response(
             {
@@ -52,6 +55,15 @@ class ReportViewSet(viewsets.ModelViewSet):
                 "has_report": bool(report.report_file),
             }
         )
+
+    # restart reportt processing
+    @action(detail=True, methods=["post"])
+    def restart(self, request, uuid=None):
+        report = self.get_object()
+        report.status = Report.STATUS_PENDING
+        report.save()
+        start_detective.delay(str(report.company.uuid), str(report.uuid))
+        return Response({"status": "restarted"}, status=status.HTTP_200_OK)
 
     def get_queryset(self):
         queryset = Report.objects.all()

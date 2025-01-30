@@ -3,7 +3,7 @@ from tempfile import NamedTemporaryFile
 import logging
 import os
 from django.db import transaction
-from detective.models import Run, Staging, RawStatistics
+from detective.models import Run, Staging, RawStatistics, SustainabilityGlossary
 from detective.utils.scoring_rules import ClaimCategory, EvidenceStrength, ClaimImpact
 from detective.utils.run.pre import PreRunProcessor
 from detective.utils.run.post import PostRunProcessor
@@ -41,8 +41,11 @@ class Assistant:
         self.logger.info("Initializing ChatBase...")
 
     def _generate_scoring_guidelines(self):
-        """Generate scoring guidelines based on scoring rules"""
+        """Generate scoring guidelines with glossary context"""
+        glossary_context = self._get_glossary_context()
         return f"""
+        {glossary_context}
+
         Please analyze each environmental claim using the following structured format and criteria.
         Provide your response in JSON format with detailed scoring for each claim:
 
@@ -133,6 +136,14 @@ class Assistant:
             for name, value in enum_class.__members__.items()
         )
 
+    def _has_glossary_terms(self, text):
+        """Check if text contains any sustainability glossary terms"""
+        glossary_terms = SustainabilityGlossary.objects.filter(defunct=False)
+        for term in glossary_terms:
+            if term.term.lower() in text.lower():
+                return True
+        return False
+
     def trigger_staging_run(self):
         """
         Trigger a run for a thread
@@ -141,6 +152,16 @@ class Assistant:
             with transaction.atomic():
                 if self.staging_data.processed == Staging.STATUS_PROCESSED:
                     self.logger.info(f"Staging data already processed: {self.staging_data.uuid}")
+                    return
+
+                # Check for glossary terms
+                if not self._has_glossary_terms(self.staging_data.raw):
+                    self.logger.info(
+                        f"No glossary terms found in staging data: {self.staging_data.uuid}"
+                    )
+                    self.staging_data.processed = Staging.STATUS_PROCESSED
+                    self.staging_data.defunct = True
+                    self.staging_data.save()
                     return
 
                 url = self.staging_data.url
@@ -185,6 +206,14 @@ class Assistant:
                     )
                     # Mark the statistic as processed
                     self.stat_data.processed = RawStatistics.STATUS_FAILED
+                    self.stat_data.save()
+                    return
+
+                # Check for glossary terms
+                if not self._has_glossary_terms(self.stat_data.claim):
+                    self.logger.info(f"No glossary terms found in claim: {self.stat_data.claim}")
+                    self.stat_data.processed = RawStatistics.STATUS_PROCESSED
+                    self.stat_data.defunct = True
                     self.stat_data.save()
                     return
 
@@ -412,3 +441,14 @@ class Assistant:
         processor_class = PreRunProcessor if pre_process else PostRunProcessor
         processor = processor_class(staging_uuid, run_uuid, stat_uuid)
         processor.start_processing()
+
+    def _get_glossary_context(self):
+        """Get relevant glossary terms and their definitions"""
+        glossary_terms = SustainabilityGlossary.objects.filter(defunct=False)
+        context = "Relevant Sustainability Glossary Terms:\n"
+        for term in glossary_terms:
+            context += f"- {term.term}: {term.definition}"
+            if term.context:
+                context += f" (Context: {term.context})"
+            context += "\n"
+        return context
