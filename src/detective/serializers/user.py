@@ -2,8 +2,6 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from detective.models import (
-    Company,
-    Report,
     Business,
     UserProfile,
     InviteCode,
@@ -31,15 +29,30 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         # If we're getting a UserProfile instance directly
         if isinstance(instance, UserProfile):
-            return super().to_representation(instance.user)
-        # If we're getting a User instance
-        return super().to_representation(instance)
+            profile = instance
+        else:
+            profile = instance.profile
+
+        # Get the business data
+        business = None
+        if profile.business:
+            business = BusinessSerializer(profile.business).data
+
+        return {"job_title": profile.job_title, "phone": profile.phone, "business": business}
+
+    def to_internal_value(self, data):
+        # Handle business data properly during deserialization
+        business_data = data.pop("business", None)
+        internal_data = super().to_internal_value(data)
+        if business_data is not None:
+            internal_data["business"] = business_data
+        return internal_data
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer()
+    profile = UserProfileSerializer(read_only=True)
     invite_code = serializers.CharField(write_only=True)
-    business = BusinessSerializer(required=False, allow_null=True)
+    business = BusinessSerializer(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = User
@@ -76,12 +89,11 @@ class UserSerializer(serializers.ModelSerializer):
         business = None
         if business_data:
             business = Business.objects.create(**business_data)
+            user.profile.business = business
 
         # Update profile
         user.profile.job_title = profile_data.get("job_title", "")
         user.profile.phone = profile_data.get("phone", "")
-        if business:
-            user.profile.business = business
         user.profile.save()
 
         # Mark invite code as used

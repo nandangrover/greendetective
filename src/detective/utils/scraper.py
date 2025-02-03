@@ -24,6 +24,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from random import choice
+from functools import lru_cache
 
 
 class Scraper:
@@ -70,6 +71,12 @@ class Scraper:
         self.proxy_pool = []
         self.current_proxy_index = 0
         self._initialize_proxy_pool()
+
+        self.proxy_cache = {}  # Cache for working proxies
+        self.proxy_timeout = 5  # Timeout for proxy testing
+        self.max_parallel_proxy_tests = 20  # Max parallel proxy tests
+        self.proxy_refresh_interval = 300  # Refresh proxy list every 5 minutes
+        self.last_proxy_refresh = 0
 
     def _initialize_proxy_pool(self):
         """Initialize a pool of proxies"""
@@ -156,8 +163,8 @@ class Scraper:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _scrape_content(self, url):
         try:
-            proxies = self._get_proxy()
-            response = self.scraper.get(url, proxies=proxies)
+            proxy = self._get_proxy()
+            response = self.scraper.get(url, proxies=proxy)
             soup = BeautifulSoup(response.content, "html.parser")
             texts = soup.stripped_strings
             content = " ".join(texts)
@@ -293,41 +300,67 @@ class Scraper:
 
     def _try_cloudscraper(self, url):
         """Try using cloudscraper"""
-        proxies = self._get_proxy()
         try:
-            return self.scraper.get(
-                url, timeout=30, allow_redirects=True, proxies=proxies if proxies else None
-            )
-        except Exception as e:
-            self.logger.error(f"Cloudscraper failed with proxy: {e}")
-            # Retry without proxy if proxy fails
+            # First try without proxy
+            response = self.scraper.get(url, timeout=30, allow_redirects=True)
+            if response.status_code == 200:
+                return response
+
+            # If direct request fails, try with proxy
+            proxies = self._get_proxy()
             if proxies:
-                return self.scraper.get(url, timeout=30, allow_redirects=True)
+                try:
+                    return self.scraper.get(
+                        url, timeout=30, allow_redirects=True, proxies=proxies
+                    )
+                except Exception as proxy_error:
+                    self.logger.warning(f"Cloudscraper failed with proxy: {proxy_error}")
+                    # Fall back to direct request
+                    return self.scraper.get(url, timeout=30, allow_redirects=True)
+
+            return response
+        except Exception as e:
+            self.logger.error(f"Cloudscraper failed: {e}")
             raise
 
     def _try_selenium(self, url):
         """Try using undetected-chromedriver"""
         try:
-            driver = self._get_driver()
-            driver.get(url)
+            # Initialize new driver instance for each request
+            options = uc.ChromeOptions()
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-blink-features=AutomationControlled")
 
-            # Wait for page to load
+            # Use fresh driver instance
+            driver = uc.Chrome(options=options)
+            driver.set_page_load_timeout(30)
+
+            driver.get(url)
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
-            # Wait additional time if Cloudflare is detected
             if "Verifying your connection" in driver.page_source:
                 time.sleep(5)
 
-            # Create a requests-like response object
             class SeleniumResponse:
                 def __init__(self, driver):
                     self.text = driver.page_source
                     self.content = driver.page_source.encode("utf-8")
                     self.status_code = 200
 
-            return SeleniumResponse(driver)
+            response = SeleniumResponse(driver)
+            driver.quit()  # Clean up immediately
+            return response
         except Exception as e:
             self.logger.error(f"Selenium request failed: {e}")
+            if "driver" in locals():
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
             raise
 
     def _try_regular_request(self, url):
@@ -421,38 +454,67 @@ class Scraper:
         )
         return urlunparse(normalized)
 
+    @lru_cache(maxsize=100)
     def _get_proxy(self):
-        """Get a free proxy from public proxy list"""
-        try:
-            # Get free proxy list
-            response = requests.get(
-                "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt"
-            )
-            proxies = response.text.split("\n")
-            working_proxies = []
+        """Get a cached working proxy with parallel testing"""
+        current_time = time.time()
+        if current_time - self.last_proxy_refresh > self.proxy_refresh_interval:
+            self._refresh_proxy_pool()
+            self.last_proxy_refresh = current_time
 
-            # Test proxies (optional)
-            for proxy in proxies[:10]:  # Test first 10 only
-                if self._test_proxy(proxy.strip()):
-                    working_proxies.append(proxy.strip())
-
-            if working_proxies:
-                proxy = choice(working_proxies)
-                return {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-        except Exception as e:
-            self.logger.error(f"Error getting proxy: {e}")
+        if self.proxy_cache:
+            return choice(list(self.proxy_cache.items()))
 
         return None
 
-    def _test_proxy(self, proxy):
-        """Test if proxy is working"""
+    def _refresh_proxy_pool(self):
+        """Refresh the proxy pool with parallel testing"""
         try:
-            requests.get(
-                "http://www.google.com",
-                proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"},
-                timeout=3,
+            response = requests.get(
+                "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+                timeout=10,
             )
-            return True
-        except requests.RequestException as e:
-            self.logger.debug(f"Proxy {proxy} failed: {e}")
+            proxies = response.text.split("\n")[:100]  # Only take first 100 proxies
+
+            # Test proxies in parallel
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.max_parallel_proxy_tests
+            ) as executor:
+                future_to_proxy = {
+                    executor.submit(self._test_proxy, proxy.strip()): proxy.strip()
+                    for proxy in proxies
+                    if proxy.strip()
+                }
+
+                for future in concurrent.futures.as_completed(future_to_proxy):
+                    proxy = future_to_proxy[future]
+                    try:
+                        if future.result():
+                            self.proxy_cache[proxy] = time.time()
+                    except Exception:
+                        pass
+
+            # Clean up old proxies
+            current_time = time.time()
+            self.proxy_cache = {
+                proxy: timestamp
+                for proxy, timestamp in self.proxy_cache.items()
+                if current_time - timestamp < self.proxy_refresh_interval
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error refreshing proxy pool: {e}")
+
+    def _test_proxy(self, proxy):
+        """Optimized proxy testing"""
+        try:
+            test_url = self.start_url or "http://httpbin.org/ip"
+            session = requests.Session()
+            response = session.get(
+                test_url,
+                proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"},
+                timeout=self.proxy_timeout,
+            )
+            return response.status_code == 200
+        except Exception:
             return False

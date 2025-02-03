@@ -25,6 +25,10 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
     ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry && \
     poetry config virtualenvs.create false
 
+ENV DISPLAY=:99
+RUN CHROME_DRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
+    echo "CHROME_DRIVER_VERSION=${CHROME_DRIVER_VERSION}" >> /etc/environment
+
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg2 \
