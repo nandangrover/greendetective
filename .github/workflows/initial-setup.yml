@@ -1,7 +1,7 @@
 name: Initial Infrastructure Setup
 
 on:
-  workflow_dispatch:  # Manually triggered
+  workflow_dispatch:
 
 env:
   AWS_REGION: eu-west-2

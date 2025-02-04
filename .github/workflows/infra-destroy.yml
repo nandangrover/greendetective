@@ -1,7 +1,7 @@
 name: Destroy Infrastructure
 
 on:
-  workflow_dispatch:  # Manually triggered
+  workflow_dispatch:
 
 env:
   AWS_REGION: eu-west-2
@@ -20,6 +20,11 @@ jobs:
           aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
           audience: sts.amazonaws.com
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: 1.5.0
 
       - name: Terraform Init
         run: terraform init
