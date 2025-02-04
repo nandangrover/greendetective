@@ -8,6 +8,10 @@ resource "aws_vpc" "main" {
   tags = {
     Name = "green-detective-vpc"
   }
+
+  lifecycle {
+    ignore_changes = [cidr_block, tags]
+  }
 }
 
 resource "aws_subnet" "public" {
@@ -279,12 +283,13 @@ resource "aws_lb_listener" "process" {
 }
 
 # IAM Role
-resource "aws_iam_role" "ecs_task_execution_role" {
+data "aws_iam_role" "existing_ecs_task_execution_role" {
   name = "green-detective-ecs-task-execution-role"
+}
 
-  lifecycle {
-    ignore_changes = [name]
-  }
+resource "aws_iam_role" "ecs_task_execution_role" {
+  count = data.aws_iam_role.existing_ecs_task_execution_role.name == "" ? 1 : 0
+  name = "green-detective-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -306,29 +311,32 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
 }
 
 # ECR Repositories
-resource "aws_ecr_repository" "api" {
+data "aws_ecr_repository" "existing_api" {
   name = "green-detective-api"
+}
 
-  lifecycle {
-    ignore_changes = [name]
-  }
+resource "aws_ecr_repository" "api" {
+  count = data.aws_ecr_repository.existing_api.name == "" ? 1 : 0
+  name = "green-detective-api"
+}
+
+data "aws_ecr_repository" "existing_process" {
+  name = "green-detective-process"
 }
 
 resource "aws_ecr_repository" "process" {
+  count = data.aws_ecr_repository.existing_process.name == "" ? 1 : 0
   name = "green-detective-process"
-
-  lifecycle {
-    ignore_changes = [name]
-  }
 }
 
 # S3 Bucket for Reports
-resource "aws_s3_bucket" "reports" {
+data "aws_s3_bucket" "existing_reports" {
   bucket = "green-detective-reports"
+}
 
-  lifecycle {
-    ignore_changes = [bucket]
-  }
+resource "aws_s3_bucket" "reports" {
+  count = data.aws_s3_bucket.existing_reports.bucket == "" ? 1 : 0
+  bucket = "green-detective-reports"
 }
 
 resource "aws_s3_bucket_policy" "reports" {
@@ -394,12 +402,13 @@ resource "aws_security_group" "redis" {
 }
 
 # Secrets Manager for Database Credentials
-resource "aws_secretsmanager_secret" "db_credentials" {
+data "aws_secretsmanager_secret" "existing_db_credentials" {
   name = "green-detective-db-credentials"
+}
 
-  lifecycle {
-    ignore_changes = [name]
-  }
+resource "aws_secretsmanager_secret" "db_credentials" {
+  count = data.aws_secretsmanager_secret.existing_db_credentials.name == "" ? 1 : 0
+  name = "green-detective-db-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
@@ -414,20 +423,22 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 }
 
 # CloudWatch Logs
-resource "aws_cloudwatch_log_group" "api" {
+data "aws_cloudwatch_log_group" "existing_api_logs" {
   name = "/ecs/green-detective-api"
+}
 
-  lifecycle {
-    ignore_changes = [name]
-  }
+resource "aws_cloudwatch_log_group" "api" {
+  count = data.aws_cloudwatch_log_group.existing_api_logs.name == "" ? 1 : 0
+  name = "/ecs/green-detective-api"
+}
+
+data "aws_cloudwatch_log_group" "existing_process_logs" {
+  name = "/ecs/green-detective-process"
 }
 
 resource "aws_cloudwatch_log_group" "process" {
+  count = data.aws_cloudwatch_log_group.existing_process_logs.name == "" ? 1 : 0
   name = "/ecs/green-detective-process"
-
-  lifecycle {
-    ignore_changes = [name]
-  }
 }
 
 # Auto Scaling Policies
