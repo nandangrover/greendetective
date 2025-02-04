@@ -19,6 +19,15 @@ resource "aws_subnet" "public" {
   }
 }
 
+resource "aws_subnet" "public_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "eu-west-2b"
+  tags = {
+    Name = "green-detective-public-subnet-b"
+  }
+}
+
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
   tags = {
@@ -193,7 +202,7 @@ resource "aws_db_instance" "green_detective" {
 
 resource "aws_db_subnet_group" "main" {
   name       = "green-detective-db-subnet-group"
-  subnet_ids = [aws_subnet.public.id]
+  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id]
 }
 
 resource "aws_security_group" "rds" {
@@ -222,7 +231,7 @@ resource "aws_lb" "green_detective" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs.id]
-  subnets            = [aws_subnet.public.id]
+  subnets            = [aws_subnet.public.id, aws_subnet.public_b.id]
 }
 
 resource "aws_lb_target_group" "api" {
@@ -230,6 +239,10 @@ resource "aws_lb_target_group" "api" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_lb_target_group" "process" {
@@ -237,6 +250,10 @@ resource "aws_lb_target_group" "process" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_lb_listener" "api" {
@@ -265,6 +282,10 @@ resource "aws_lb_listener" "process" {
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "green-detective-ecs-task-execution-role"
 
+  lifecycle {
+    ignore_changes = [name]
+  }
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -287,15 +308,27 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
 # ECR Repositories
 resource "aws_ecr_repository" "api" {
   name = "green-detective-api"
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_ecr_repository" "process" {
   name = "green-detective-process"
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 # S3 Bucket for Reports
 resource "aws_s3_bucket" "reports" {
   bucket = "green-detective-reports"
+
+  lifecycle {
+    ignore_changes = [bucket]
+  }
 }
 
 resource "aws_s3_bucket_policy" "reports" {
@@ -333,7 +366,11 @@ resource "aws_elasticache_cluster" "redis" {
 
 resource "aws_elasticache_subnet_group" "main" {
   name       = "green-detective-redis-subnet-group"
-  subnet_ids = [aws_subnet.public.id]
+  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id]
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_security_group" "redis" {
@@ -359,6 +396,10 @@ resource "aws_security_group" "redis" {
 # Secrets Manager for Database Credentials
 resource "aws_secretsmanager_secret" "db_credentials" {
   name = "green-detective-db-credentials"
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
@@ -375,10 +416,18 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 # CloudWatch Logs
 resource "aws_cloudwatch_log_group" "api" {
   name = "/ecs/green-detective-api"
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "aws_cloudwatch_log_group" "process" {
   name = "/ecs/green-detective-process"
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 # Auto Scaling Policies
