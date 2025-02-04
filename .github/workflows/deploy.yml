@@ -30,6 +30,18 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           audience: sts.amazonaws.com
 
+      - name: Check if ECR repositories exist
+        id: check-ecr
+        run: |
+          if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_API }} > /dev/null 2>&1; then
+            echo "ECR repository ${{ env.ECR_REPOSITORY_API }} does not exist. Run the initial-setup workflow first."
+            exit 1
+          fi
+          if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_PROCESS }} > /dev/null 2>&1; then
+            echo "ECR repository ${{ env.ECR_REPOSITORY_PROCESS }} does not exist. Run the initial-setup workflow first."
+            exit 1
+          fi
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -59,10 +71,10 @@ jobs:
     needs: build-and-push
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4.0.3
         with:
           aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
@@ -70,7 +82,7 @@ jobs:
           audience: sts.amazonaws.com
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: 1.5.0
 
