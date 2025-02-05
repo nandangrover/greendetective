@@ -351,7 +351,15 @@ resource "aws_secretsmanager_secret" "db_credentials" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
-  secret_id = data.aws_secretsmanager_secret.db_credentials.id
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    username = "root"
+    password = var.db_password
+    engine   = "postgres"
+    host     = aws_db_instance.green_detective.endpoint
+    port     = 5432
+    dbname   = "greendetective"
+  })
 }
 
 # CloudWatch Logs
