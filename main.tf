@@ -201,12 +201,11 @@ resource "aws_db_instance" "green_detective" {
   publicly_accessible    = false
   skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.rds.id]
-  db_subnet_group_name   = aws_db_subnet_group.main.name
+  db_subnet_group_name   = data.aws_db_subnet_group.main.name
 }
 
-resource "aws_db_subnet_group" "main" {
-  name       = "green-detective-db-subnet-group"
-  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id]
+data "aws_db_subnet_group" "main" {
+  name = "green-detective-db-subnet-group"
 }
 
 resource "aws_security_group" "rds" {
@@ -382,7 +381,7 @@ resource "aws_security_group" "redis" {
 
 # Secrets Manager for Database Credentials
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name = "green-detective-db-credentials"
+  name = "green-detective-db-credentials-v2"
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
