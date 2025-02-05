@@ -205,7 +205,7 @@ resource "aws_db_instance" "green_detective" {
   instance_class         = "db.t3.micro"
   db_name                = "greendetective"
   username               = "root"
-  password               = jsondecode(data.aws_secretsmanager_secret_version.db_credentials.secret_string)["password"]
+  password               = var.db_password
   parameter_group_name   = "default.postgres17"
   publicly_accessible    = false
   skip_final_snapshot    = true
@@ -253,12 +253,24 @@ data "aws_lb_target_group" "process" {
 
 resource "aws_lb_listener" "api" {
   load_balancer_arn = data.aws_lb.green_detective.arn
-  port              = 80
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = data.aws_lb_target_group.api.arn
+  }
 }
 
 resource "aws_lb_listener" "process" {
   load_balancer_arn = data.aws_lb.green_detective.arn
-  port              = 81
+  port              = "81"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = data.aws_lb_target_group.process.arn
+  }
 }
 
 # IAM Role
@@ -428,59 +440,4 @@ variable "db_password" {
 # ElastiCache Subnet Group
 data "aws_elasticache_subnet_group" "main" {
   name = "green-detective-redis-subnet-group"
-}
-
-# Add IAM policy for GitHub user to pass role
-resource "aws_iam_policy" "github_pass_role" {
-  name        = "github-pass-role-policy"
-  description = "Allows GitHub user to pass ECS task execution role"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = "iam:PassRole"
-        Resource = data.aws_iam_role.ecs_task_execution_role.arn
-      }
-    ]
-  })
-}
-
-# Attach policy to GitHub user
-resource "aws_iam_user_policy_attachment" "github_pass_role" {
-  user       = "github"
-  policy_arn = aws_iam_policy.github_pass_role.arn
-}
-
-# Import existing ElastiCache cluster
-data "aws_elasticache_cluster" "redis" {
-  cluster_id = "green-detective-redis"
-}
-
-resource "aws_subnet" "private_a" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.4.0/24"
-  availability_zone = "eu-west-2a"
-  tags = {
-    Name = "green-detective-private-subnet-a"
-  }
-}
-
-resource "aws_subnet" "private_b" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.5.0/24"
-  availability_zone = "eu-west-2b"
-  tags = {
-    Name = "green-detective-private-subnet-b"
-  }
-}
-
-resource "aws_subnet" "private_c" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.6.0/24"
-  availability_zone = "eu-west-2c"
-  tags = {
-    Name = "green-detective-private-subnet-c"
-  }
 }
