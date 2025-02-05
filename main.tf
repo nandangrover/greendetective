@@ -95,12 +95,12 @@ resource "aws_ecs_task_definition" "api" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-  execution_role_arn         = aws_iam_role.ecs_task_execution_role[0].arn
+  execution_role_arn         = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "api"
-      image     = "${aws_ecr_repository.api[0].repository_url}:latest"
+      image     = "${aws_ecr_repository.api.repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -144,12 +144,12 @@ resource "aws_ecs_task_definition" "process" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "512"
   memory                   = "1024"
-  execution_role_arn         = aws_iam_role.ecs_task_execution_role[0].arn
+  execution_role_arn         = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "process"
-      image     = "${aws_ecr_repository.process[0].repository_url}:latest"
+      image     = "${aws_ecr_repository.process.repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -288,9 +288,7 @@ data "aws_iam_role" "existing_ecs_task_execution_role" {
 }
 
 resource "aws_iam_role" "ecs_task_execution_role" {
-  count = data.aws_iam_role.existing_ecs_task_execution_role.name == "" ? 1 : 0
   name = "green-detective-ecs-task-execution-role"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -306,7 +304,7 @@ resource "aws_iam_role" "ecs_task_execution_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution_role[0].name
+  role = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
@@ -316,7 +314,6 @@ data "aws_ecr_repository" "existing_api" {
 }
 
 resource "aws_ecr_repository" "api" {
-  count = data.aws_ecr_repository.existing_api.name == "" ? 1 : 0
   name = "green-detective-api"
 }
 
@@ -325,7 +322,6 @@ data "aws_ecr_repository" "existing_process" {
 }
 
 resource "aws_ecr_repository" "process" {
-  count = data.aws_ecr_repository.existing_process.name == "" ? 1 : 0
   name = "green-detective-process"
 }
 
@@ -335,12 +331,11 @@ data "aws_s3_bucket" "existing_reports" {
 }
 
 resource "aws_s3_bucket" "reports" {
-  count = data.aws_s3_bucket.existing_reports.bucket == "" ? 1 : 0
   bucket = "green-detective-reports"
 }
 
 resource "aws_s3_bucket_policy" "reports" {
-  bucket = aws_s3_bucket.reports[0].bucket
+  bucket = aws_s3_bucket.reports.bucket
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -407,12 +402,11 @@ data "aws_secretsmanager_secret" "existing_db_credentials" {
 }
 
 resource "aws_secretsmanager_secret" "db_credentials" {
-  count = data.aws_secretsmanager_secret.existing_db_credentials.name == "" ? 1 : 0
   name = "green-detective-db-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
-  secret_id = aws_secretsmanager_secret.db_credentials[0].id
+  secret_id = aws_secretsmanager_secret.db_credentials.id
   secret_string = jsonencode({
     username = "root"
     password = var.db_password
@@ -428,7 +422,6 @@ data "aws_cloudwatch_log_group" "existing_api_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "api" {
-  count = data.aws_cloudwatch_log_group.existing_api_logs.name == "" ? 1 : 0
   name = "/ecs/green-detective-api"
 }
 
@@ -437,7 +430,6 @@ data "aws_cloudwatch_log_group" "existing_process_logs" {
 }
 
 resource "aws_cloudwatch_log_group" "process" {
-  count = data.aws_cloudwatch_log_group.existing_process_logs.name == "" ? 1 : 0
   name = "/ecs/green-detective-process"
 }
 
@@ -506,7 +498,7 @@ output "redis_endpoint" {
 }
 
 output "s3_bucket_name" {
-  value = aws_s3_bucket.reports[0].bucket
+  value = aws_s3_bucket.reports.bucket
 }
 
 variable "db_password" {
