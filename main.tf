@@ -32,6 +32,15 @@ resource "aws_subnet" "public_b" {
   }
 }
 
+resource "aws_subnet" "public_c" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "eu-west-2c"
+  tags = {
+    Name = "green-detective-public-subnet-c"
+  }
+}
+
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
   tags = {
@@ -95,12 +104,12 @@ resource "aws_ecs_task_definition" "api" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-  execution_role_arn         = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn         = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "api"
-      image     = "${aws_ecr_repository.api.repository_url}:latest"
+      image     = "${data.aws_ecr_repository.api.repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -131,7 +140,7 @@ resource "aws_ecs_service" "api" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = data.aws_lb_target_group.api.arn
     container_name   = "api"
     container_port   = 8070
   }
@@ -144,12 +153,12 @@ resource "aws_ecs_task_definition" "process" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "512"
   memory                   = "1024"
-  execution_role_arn         = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn         = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "process"
-      image     = "${aws_ecr_repository.process.repository_url}:latest"
+      image     = "${data.aws_ecr_repository.process.repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -180,7 +189,7 @@ resource "aws_ecs_service" "process" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.process.arn
+    target_group_arn = data.aws_lb_target_group.process.arn
     container_name   = "process"
     container_port   = 8071
   }
@@ -229,96 +238,62 @@ resource "aws_security_group" "rds" {
 }
 
 # Load Balancer
-resource "aws_lb" "green_detective" {
-  name               = "green-detective-lb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.ecs.id]
-  subnets            = [aws_subnet.public.id, aws_subnet.public_b.id]
+data "aws_lb" "green_detective" {
+  name = "green-detective-lb"
 }
 
-resource "aws_lb_target_group" "api" {
-  name     = "green-detective-api-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
-
-  lifecycle {
-    ignore_changes = [name]
-  }
+# Target Groups
+data "aws_lb_target_group" "api" {
+  name = "green-detective-api-tg"
 }
 
-resource "aws_lb_target_group" "process" {
-  name     = "green-detective-process-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
-
-  lifecycle {
-    ignore_changes = [name]
-  }
+data "aws_lb_target_group" "process" {
+  name = "green-detective-process-tg"
 }
 
 resource "aws_lb_listener" "api" {
-  load_balancer_arn = aws_lb.green_detective.arn
+  load_balancer_arn = data.aws_lb.green_detective.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = data.aws_lb_target_group.api.arn
   }
 }
 
 resource "aws_lb_listener" "process" {
-  load_balancer_arn = aws_lb.green_detective.arn
+  load_balancer_arn = data.aws_lb.green_detective.arn
   port              = "81"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.process.arn
+    target_group_arn = data.aws_lb_target_group.process.arn
   }
 }
 
 # IAM Role
-resource "aws_iam_role" "ecs_task_execution_role" {
+data "aws_iam_role" "ecs_task_execution_role" {
   name = "green-detective-ecs-task-execution-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 # ECR Repositories
-resource "aws_ecr_repository" "api" {
+data "aws_ecr_repository" "api" {
   name = "green-detective-api"
 }
 
-resource "aws_ecr_repository" "process" {
+data "aws_ecr_repository" "process" {
   name = "green-detective-process"
 }
 
-# S3 Bucket for Reports
-resource "aws_s3_bucket" "reports" {
+# S3 Bucket
+data "aws_s3_bucket" "reports" {
   bucket = "green-detective-reports"
 }
 
 resource "aws_s3_bucket_policy" "reports" {
-  bucket = aws_s3_bucket.reports.bucket
+  bucket = data.aws_s3_bucket.reports.bucket
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -347,16 +322,7 @@ resource "aws_elasticache_cluster" "redis" {
   engine_version       = "6.x"
   port                 = 6379
   security_group_ids   = [aws_security_group.redis.id]
-  subnet_group_name    = aws_elasticache_subnet_group.main.name
-}
-
-resource "aws_elasticache_subnet_group" "main" {
-  name       = "green-detective-redis-subnet-group"
-  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id]
-
-  lifecycle {
-    ignore_changes = [name]
-  }
+  subnet_group_name    = data.aws_elasticache_subnet_group.main.name
 }
 
 resource "aws_security_group" "redis" {
@@ -396,11 +362,11 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 }
 
 # CloudWatch Logs
-resource "aws_cloudwatch_log_group" "api" {
+data "aws_cloudwatch_log_group" "api" {
   name = "/ecs/green-detective-api"
 }
 
-resource "aws_cloudwatch_log_group" "process" {
+data "aws_cloudwatch_log_group" "process" {
   name = "/ecs/green-detective-process"
 }
 
@@ -409,8 +375,8 @@ resource "aws_appautoscaling_target" "api" {
   service_namespace  = "ecs"
   resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
   scalable_dimension = "ecs:service:DesiredCount"
-  min_capacity       = 2
-  max_capacity       = 10
+  min_capacity       = 1
+  max_capacity       = 3
 }
 
 resource "aws_appautoscaling_policy" "api_cpu" {
@@ -432,8 +398,8 @@ resource "aws_appautoscaling_target" "process" {
   service_namespace  = "ecs"
   resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.process.name}"
   scalable_dimension = "ecs:service:DesiredCount"
-  min_capacity       = 2
-  max_capacity       = 10
+  min_capacity       = 1
+  max_capacity       = 3
 }
 
 resource "aws_appautoscaling_policy" "process_cpu" {
@@ -453,11 +419,11 @@ resource "aws_appautoscaling_policy" "process_cpu" {
 
 # Outputs
 output "api_endpoint" {
-  value = aws_lb.green_detective.dns_name
+  value = data.aws_lb.green_detective.dns_name
 }
 
 output "process_endpoint" {
-  value = "${aws_lb.green_detective.dns_name}:81"
+  value = "${data.aws_lb.green_detective.dns_name}:81"
 }
 
 output "database_endpoint" {
@@ -469,11 +435,16 @@ output "redis_endpoint" {
 }
 
 output "s3_bucket_name" {
-  value = aws_s3_bucket.reports.bucket
+  value = data.aws_s3_bucket.reports.bucket
 }
 
 variable "db_password" {
   description = "Database password"
   type        = string
   sensitive   = true
+}
+
+# ElastiCache Subnet Group
+data "aws_elasticache_subnet_group" "main" {
+  name = "green-detective-redis-subnet-group"
 }
