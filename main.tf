@@ -309,16 +309,8 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
 }
 
 # ECR Repositories
-data "aws_ecr_repository" "existing_api" {
-  name = "green-detective-api"
-}
-
 resource "aws_ecr_repository" "api" {
   name = "green-detective-api"
-}
-
-data "aws_ecr_repository" "existing_process" {
-  name = "green-detective-process"
 }
 
 resource "aws_ecr_repository" "process" {
@@ -326,10 +318,6 @@ resource "aws_ecr_repository" "process" {
 }
 
 # S3 Bucket for Reports
-data "aws_s3_bucket" "existing_reports" {
-  bucket = "green-detective-reports"
-}
-
 resource "aws_s3_bucket" "reports" {
   bucket = "green-detective-reports"
 }
@@ -397,10 +385,6 @@ resource "aws_security_group" "redis" {
 }
 
 # Secrets Manager for Database Credentials
-data "aws_secretsmanager_secret" "existing_db_credentials" {
-  name = "green-detective-db-credentials"
-}
-
 resource "aws_secretsmanager_secret" "db_credentials" {
   name = "green-detective-db-credentials"
 }
@@ -417,16 +401,8 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 }
 
 # CloudWatch Logs
-data "aws_cloudwatch_log_group" "existing_api_logs" {
-  name = "/ecs/green-detective-api"
-}
-
 resource "aws_cloudwatch_log_group" "api" {
   name = "/ecs/green-detective-api"
-}
-
-data "aws_cloudwatch_log_group" "existing_process_logs" {
-  name = "/ecs/green-detective-process"
 }
 
 resource "aws_cloudwatch_log_group" "process" {
