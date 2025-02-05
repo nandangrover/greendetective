@@ -1,33 +1,33 @@
 name: Destroy Infrastructure
 
-on:
-  workflow_dispatch:
+# on:
+#   workflow_dispatch:
 
-env:
-  AWS_REGION: eu-west-2
+# env:
+#   AWS_REGION: eu-west-2
 
-jobs:
-  terraform-init:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
+# jobs:
+#   terraform-init:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4.2.2
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.3
-        with:
-          aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
-          audience: sts.amazonaws.com
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v4.0.3
+#         with:
+#           aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ vars.AWS_REGION }}
+#           audience: sts.amazonaws.com
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
-        with:
-          terraform_version: 1.5.0
+#       - name: Set up Terraform
+#         uses: hashicorp/setup-terraform@v3.1.2
+#         with:
+#           terraform_version: 1.5.0
 
-      - name: Terraform Init
-        run: terraform init
+#       - name: Terraform Init
+#         run: terraform init
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+#       - name: Terraform Destroy
+#         run: terraform destroy -auto-approve
