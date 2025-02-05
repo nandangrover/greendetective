@@ -283,10 +283,6 @@ resource "aws_lb_listener" "process" {
 }
 
 # IAM Role
-data "aws_iam_role" "existing_ecs_task_execution_role" {
-  name = "green-detective-ecs-task-execution-role"
-}
-
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "green-detective-ecs-task-execution-role"
   assume_role_policy = jsonencode({
