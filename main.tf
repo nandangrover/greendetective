@@ -95,12 +95,12 @@ resource "aws_ecs_task_definition" "api" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn         = aws_iam_role.ecs_task_execution_role[0].arn
 
   container_definitions = jsonencode([
     {
       name      = "api"
-      image     = "${aws_ecr_repository.api.repository_url}:latest"
+      image     = "${aws_ecr_repository.api[0].repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -144,12 +144,12 @@ resource "aws_ecs_task_definition" "process" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "512"
   memory                   = "1024"
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn         = aws_iam_role.ecs_task_execution_role[0].arn
 
   container_definitions = jsonencode([
     {
       name      = "process"
-      image     = "${aws_ecr_repository.process.repository_url}:latest"
+      image     = "${aws_ecr_repository.process[0].repository_url}:latest"
       essential = true
       portMappings = [
         {
@@ -306,7 +306,7 @@ resource "aws_iam_role" "ecs_task_execution_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution_role.name
+  role       = aws_iam_role.ecs_task_execution_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
@@ -340,7 +340,7 @@ resource "aws_s3_bucket" "reports" {
 }
 
 resource "aws_s3_bucket_policy" "reports" {
-  bucket = aws_s3_bucket.reports.bucket
+  bucket = aws_s3_bucket.reports[0].bucket
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -412,7 +412,7 @@ resource "aws_secretsmanager_secret" "db_credentials" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
-  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_id = aws_secretsmanager_secret.db_credentials[0].id
   secret_string = jsonencode({
     username = "root"
     password = var.db_password
@@ -506,7 +506,7 @@ output "redis_endpoint" {
 }
 
 output "s3_bucket_name" {
-  value = aws_s3_bucket.reports.bucket
+  value = aws_s3_bucket.reports[0].bucket
 }
 
 variable "db_password" {
