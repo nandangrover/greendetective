@@ -90,7 +90,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        run: terraform plan -var="db_password=${{ vars.DB_PASSWORD }}"
+        run: terraform plan -var="db_password=${{ vars.DB_PASSWORD }}" -var="aws_access_key=${{ vars.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ vars.AWS_SECRET_ACCESS_KEY }}"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var="db_password=${{ vars.DB_PASSWORD }}"
+        run: terraform apply -auto-approve -var="db_password=${{ vars.DB_PASSWORD }}" -var="aws_access_key=${{ vars.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ vars.AWS_SECRET_ACCESS_KEY }}"

@@ -13,3 +13,12 @@ docker/database_mount/pgsql_docker_mount/*
 docker/database_mount/pgsql_docker_mount_restore/*
 docker/database_mount/neo4j_docker_mount/*
 docker/database_mount/neo4j/*
+
+# Ignore terraform.tfvars
+terraform.tfvars
+
+# Terraform files
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

@@ -1,5 +1,10 @@
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+
 provider "aws" {
-  region = "eu-west-2"
+  region     = "eu-west-2"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
 }
 
 # VPC and Networking
@@ -140,7 +145,7 @@ resource "aws_ecs_service" "api" {
   }
 
   load_balancer {
-    target_group_arn = data.aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.api.arn
     container_name   = "api"
     container_port   = 8070
   }
@@ -189,13 +194,22 @@ resource "aws_ecs_service" "process" {
   }
 
   load_balancer {
-    target_group_arn = data.aws_lb_target_group.process.arn
+    target_group_arn = aws_lb_target_group.process.arn
     container_name   = "process"
     container_port   = 8071
   }
 }
 
 # Database
+resource "aws_db_subnet_group" "main" {
+  name       = "green-detective-db-subnet-group"
+  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
+
+  tags = {
+    Name = "green-detective-db-subnet-group"
+  }
+}
+
 resource "aws_db_instance" "green_detective" {
   identifier             = "green-detective-db"
   allocated_storage      = 20
@@ -210,11 +224,9 @@ resource "aws_db_instance" "green_detective" {
   publicly_accessible    = false
   skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.rds.id]
-  db_subnet_group_name   = data.aws_db_subnet_group.main.name
-}
-
-data "aws_db_subnet_group" "main" {
-  name = "green-detective-db-subnet-group"
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  backup_retention_period = 3  # Keep backups for 3 days
+  backup_window          = "03:00-04:00"  # Daily backup window
 }
 
 resource "aws_security_group" "rds" {
@@ -238,38 +250,70 @@ resource "aws_security_group" "rds" {
 }
 
 # Load Balancer
-data "aws_lb" "green_detective" {
-  name = "green-detective-lb"
+resource "aws_lb" "green_detective" {
+  name               = "green-detective-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.ecs.id]
+  subnets            = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
+
+  enable_deletion_protection = false
 }
 
 # Target Groups
-data "aws_lb_target_group" "api" {
-  name = "green-detective-api-tg"
+resource "aws_lb_target_group" "api" {
+  name     = "green-detective-api-tg"
+  port     = 8070
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
 }
 
-data "aws_lb_target_group" "process" {
-  name = "green-detective-process-tg"
+resource "aws_lb_target_group" "process" {
+  name     = "green-detective-process-tg"
+  port     = 8071
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
 }
 
 resource "aws_lb_listener" "api" {
-  load_balancer_arn = data.aws_lb.green_detective.arn
+  load_balancer_arn = aws_lb.green_detective.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = data.aws_lb_target_group.api.arn
+    target_group_arn = aws_lb_target_group.api.arn
   }
 }
 
 resource "aws_lb_listener" "process" {
-  load_balancer_arn = data.aws_lb.green_detective.arn
+  load_balancer_arn = aws_lb.green_detective.arn
   port              = "81"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = data.aws_lb_target_group.process.arn
+    target_group_arn = aws_lb_target_group.process.arn
   }
 }
 
@@ -313,8 +357,17 @@ resource "aws_s3_bucket_policy" "reports" {
 }
 
 # Redis Cache
+resource "aws_elasticache_subnet_group" "main" {
+  name       = "green-detective-redis-subnet-group"
+  subnet_ids = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
+
+  tags = {
+    Name = "green-detective-redis-subnet-group"
+  }
+}
+
 resource "aws_elasticache_cluster" "redis" {
-  cluster_id           = "green-detective-redis-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+  cluster_id           = "green-detective-redis"
   engine               = "redis"
   node_type            = "cache.t3.micro"
   num_cache_nodes      = 1
@@ -322,7 +375,7 @@ resource "aws_elasticache_cluster" "redis" {
   engine_version       = "6.x"
   port                 = 6379
   security_group_ids   = [aws_security_group.redis.id]
-  subnet_group_name    = data.aws_elasticache_subnet_group.main.name
+  subnet_group_name    = aws_elasticache_subnet_group.main.name
 }
 
 resource "aws_security_group" "redis" {
@@ -347,7 +400,7 @@ resource "aws_security_group" "redis" {
 
 # Secrets Manager for Database Credentials
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name = "green-detective-db-credentials"
+  name = "green-detective-db-credentials-v3"
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
@@ -371,28 +424,13 @@ data "aws_cloudwatch_log_group" "process" {
   name = "/ecs/green-detective-process"
 }
 
-# Auto Scaling Policies
+# Move these resources before the scaling policies
 resource "aws_appautoscaling_target" "api" {
   service_namespace  = "ecs"
   resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
   scalable_dimension = "ecs:service:DesiredCount"
   min_capacity       = 1
   max_capacity       = 3
-}
-
-resource "aws_appautoscaling_policy" "api_cpu" {
-  name               = "api-cpu-scaling"
-  service_namespace  = "ecs"
-  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
-    }
-
-    target_value = 50
-  }
 }
 
 resource "aws_appautoscaling_target" "process" {
@@ -403,28 +441,58 @@ resource "aws_appautoscaling_target" "process" {
   max_capacity       = 3
 }
 
+# Then keep the scaling policies after the targets
+resource "aws_appautoscaling_policy" "api_cpu" {
+  name               = "api-cpu-scaling"
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  policy_type        = "StepScaling"
+
+  step_scaling_policy_configuration {
+    adjustment_type         = "ChangeInCapacity"
+    cooldown                = 60
+    metric_aggregation_type = "Average"
+
+    step_adjustment {
+      scaling_adjustment          = 1
+      metric_interval_lower_bound = 0
+      metric_interval_upper_bound = null
+    }
+  }
+
+  depends_on = [aws_appautoscaling_target.api]
+}
+
 resource "aws_appautoscaling_policy" "process_cpu" {
   name               = "process-cpu-scaling"
   service_namespace  = "ecs"
   resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.process.name}"
   scalable_dimension = "ecs:service:DesiredCount"
+  policy_type        = "StepScaling"
 
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+  step_scaling_policy_configuration {
+    adjustment_type         = "ChangeInCapacity"
+    cooldown                = 60
+    metric_aggregation_type = "Average"
+
+    step_adjustment {
+      scaling_adjustment          = 1
+      metric_interval_lower_bound = 0
+      metric_interval_upper_bound = null
     }
-
-    target_value = 50
   }
+
+  depends_on = [aws_appautoscaling_target.process]
 }
 
 # Outputs
 output "api_endpoint" {
-  value = data.aws_lb.green_detective.dns_name
+  value = aws_lb.green_detective.dns_name
 }
 
 output "process_endpoint" {
-  value = "${data.aws_lb.green_detective.dns_name}:81"
+  value = "${aws_lb.green_detective.dns_name}:81"
 }
 
 output "database_endpoint" {
@@ -445,7 +513,60 @@ variable "db_password" {
   sensitive   = true
 }
 
-# ElastiCache Subnet Group
+data "aws_db_subnet_group" "main" {
+  name = aws_db_subnet_group.main.name
+}
+
 data "aws_elasticache_subnet_group" "main" {
-  name = "green-detective-redis-subnet-group"
+  name = aws_elasticache_subnet_group.main.name
+}
+
+resource "aws_budgets_budget" "monthly" {
+  name              = "green-detective-monthly-budget"
+  budget_type       = "COST"
+  limit_amount      = "30"  # Set your monthly budget limit in USD
+  limit_unit        = "USD"
+  time_period_start = "2024-01-01_00:00"
+  time_unit         = "MONTHLY"
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80  # Alert at 80% of budget
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = ["nandangrover.5@gmail.com"]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100  # Alert at 100% of budget
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = ["nandangrover.5@gmail.com"]
+  }
+}
+
+resource "aws_budgets_budget" "daily" {
+  name              = "green-detective-daily-budget"
+  budget_type       = "COST"
+  limit_amount      = "1"  # Set your daily budget limit in USD
+  limit_unit        = "USD"
+  time_period_start = "2024-01-01_00:00"
+  time_unit         = "DAILY"
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80  # Alert at 80% of budget
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = ["nandangrover.5@gmail.com"]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100  # Alert at 100% of budget
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = ["nandangrover.5@gmail.com"]
+  }
 }
