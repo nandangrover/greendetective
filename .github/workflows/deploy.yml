@@ -48,13 +48,13 @@ jobs:
 
       - name: Build and tag API image
         run: |
-          docker build --target service-api -t ${{ env.ECR_REPOSITORY_API }}:${{ github.sha }} .
-          docker tag ${{ env.ECR_REPOSITORY_API }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:latest
+          docker build --target service-api -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }} .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:latest
 
       - name: Build and tag Process image
         run: |
-          docker build --target service-process -t ${{ env.ECR_REPOSITORY_PROCESS }}:${{ github.sha }} .
-          docker tag ${{ env.ECR_REPOSITORY_PROCESS }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:latest
+          docker build --target service-process -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:${{ github.sha }} .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:latest
 
       - name: Push API image to ECR
         run: |
