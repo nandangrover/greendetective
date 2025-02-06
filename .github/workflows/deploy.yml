@@ -65,32 +65,3 @@ jobs:
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:${{ github.sha }}
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PROCESS }}:latest
-
-  terraform-apply:
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.3
-        with:
-          aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
-          audience: sts.amazonaws.com
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
-        with:
-          terraform_version: 1.5.0
-
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Plan
-        run: terraform plan -var="db_password=${{ vars.DB_PASSWORD }}" -var="aws_access_key=${{ vars.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ vars.AWS_SECRET_ACCESS_KEY }}"
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve -var="db_password=${{ vars.DB_PASSWORD }}" -var="aws_access_key=${{ vars.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ vars.AWS_SECRET_ACCESS_KEY }}"
