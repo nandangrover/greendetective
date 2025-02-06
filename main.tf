@@ -90,9 +90,9 @@ resource "aws_security_group" "ecs" {
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -140,8 +140,9 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id]
+    subnets         = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
     security_groups = [aws_security_group.ecs.id]
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -189,8 +190,9 @@ resource "aws_ecs_service" "process" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id]
+    subnets         = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
     security_groups = [aws_security_group.ecs.id]
+    assign_public_ip = true
   }
 
   load_balancer {
