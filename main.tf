@@ -324,9 +324,9 @@ data "aws_iam_role" "ecs_task_execution_role" {
   name = "green-detective-ecs-task-execution-role"
 }
 
-# Add a new IAM policy for ECR access
-resource "aws_iam_role_policy" "ecr_access" {
-  name = "green-detective-ecr-access"
+# Update the IAM policy for full access
+resource "aws_iam_role_policy" "ecs_full_access" {
+  name = "green-detective-full-access"
   role = data.aws_iam_role.ecs_task_execution_role.name
 
   policy = jsonencode({
@@ -335,24 +335,9 @@ resource "aws_iam_role_policy" "ecr_access" {
       {
         Effect = "Allow"
         Action = [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:GetAuthorizationToken",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetRepositoryPolicy",
-          "ecr:DescribeRepositories",
-          "ecr:ListImages",
-          "ecr:DescribeImages"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken"
+          "ecr:*",
+          "s3:*",
+          "ecs:*"
         ]
         Resource = "*"
       }
