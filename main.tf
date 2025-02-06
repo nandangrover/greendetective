@@ -314,7 +314,7 @@ resource "aws_s3_bucket_policy" "reports" {
 
 # Redis Cache
 resource "aws_elasticache_cluster" "redis" {
-  cluster_id           = "green-detective-redis"
+  cluster_id           = "green-detective-redis-${formatdate("YYYYMMDDhhmmss", timestamp())}"
   engine               = "redis"
   node_type            = "cache.t3.micro"
   num_cache_nodes      = 1
