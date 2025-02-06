@@ -17,6 +17,9 @@ resource "aws_vpc" "main" {
   lifecycle {
     ignore_changes = [cidr_block, tags]
   }
+
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 }
 
 resource "aws_subnet" "public" {
@@ -69,6 +72,16 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+resource "aws_route_table_association" "public_b" {
+  subnet_id      = aws_subnet.public_b.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public_c" {
+  subnet_id      = aws_subnet.public_c.id
+  route_table_id = aws_route_table.public.id
+}
+
 # Security Groups
 resource "aws_security_group" "ecs" {
   name        = "green-detective-ecs-sg"
@@ -90,9 +103,9 @@ resource "aws_security_group" "ecs" {
   }
 
   egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
