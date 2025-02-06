@@ -23,27 +23,30 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_subnet" "public" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "eu-west-2a"  # Explicitly set AZ
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "eu-west-2a"
+  map_public_ip_on_launch = true
   tags = {
     Name = "green-detective-public-subnet"
   }
 }
 
 resource "aws_subnet" "public_b" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "eu-west-2b"
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "eu-west-2b"
+  map_public_ip_on_launch = true
   tags = {
     Name = "green-detective-public-subnet-b"
   }
 }
 
 resource "aws_subnet" "public_c" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "eu-west-2c"
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "eu-west-2c"
+  map_public_ip_on_launch = true
   tags = {
     Name = "green-detective-public-subnet-c"
   }
@@ -110,6 +113,27 @@ resource "aws_security_group" "ecs" {
   }
 }
 
+# Add a specific security group for ECR access
+resource "aws_security_group" "ecr_endpoint" {
+  name        = "green-detective-ecr-endpoint-sg"
+  description = "Security group for ECR VPC endpoints"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 # ECS Cluster
 resource "aws_ecs_cluster" "green_detective" {
   name = "green-detective"
@@ -122,7 +146,7 @@ resource "aws_ecs_task_definition" "api" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-  execution_role_arn         = data.aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -149,12 +173,12 @@ resource "aws_ecs_service" "api" {
   name            = "api"
   cluster         = aws_ecs_cluster.green_detective.id
   task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
-    security_groups = [aws_security_group.ecs.id]
+    subnets          = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
+    security_groups  = [aws_security_group.ecs.id, aws_security_group.ecr_endpoint.id]
     assign_public_ip = true
   }
 
@@ -170,9 +194,9 @@ resource "aws_ecs_task_definition" "process" {
   family                   = "green-detective-process"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
-  execution_role_arn         = data.aws_iam_role.ecs_task_execution_role.arn
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -199,12 +223,12 @@ resource "aws_ecs_service" "process" {
   name            = "process"
   cluster         = aws_ecs_cluster.green_detective.id
   task_definition = aws_ecs_task_definition.process.arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
-    security_groups = [aws_security_group.ecs.id]
+    subnets          = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
+    security_groups  = [aws_security_group.ecs.id, aws_security_group.ecr_endpoint.id]
     assign_public_ip = true
   }
 
@@ -240,8 +264,8 @@ resource "aws_db_instance" "green_detective" {
   skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
-  backup_retention_period = 3  # Keep backups for 3 days
-  backup_window          = "03:00-04:00"  # Daily backup window
+  backup_retention_period = 0
+  backup_window          = "03:00-04:00"
 }
 
 resource "aws_security_group" "rds" {
@@ -522,6 +546,33 @@ resource "aws_appautoscaling_policy" "process_cpu" {
   depends_on = [aws_appautoscaling_target.process]
 }
 
+# Add auto-scaling policies to scale down during off-hours
+resource "aws_appautoscaling_scheduled_action" "scale_down_night" {
+  name               = "scale-down-night"
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  schedule          = "cron(0 22 * * ? *)"
+
+  scalable_target_action {
+    min_capacity = 0
+    max_capacity = 0
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "scale_up_morning" {
+  name               = "scale-up-morning"
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  schedule          = "cron(0 6 * * ? *)"
+
+  scalable_target_action {
+    min_capacity = 1
+    max_capacity = 1
+  }
+}
+
 # Outputs
 output "api_endpoint" {
   value = aws_lb.green_detective.dns_name
@@ -560,14 +611,14 @@ data "aws_elasticache_subnet_group" "main" {
 resource "aws_budgets_budget" "monthly" {
   name              = "green-detective-monthly-budget"
   budget_type       = "COST"
-  limit_amount      = "30"  # Set your monthly budget limit in USD
+  limit_amount      = "30"
   limit_unit        = "USD"
   time_period_start = "2024-01-01_00:00"
   time_unit         = "MONTHLY"
 
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                  = 80  # Alert at 80% of budget
+    threshold                  = 80
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = ["nandangrover.5@gmail.com"]
@@ -575,7 +626,7 @@ resource "aws_budgets_budget" "monthly" {
 
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                  = 100  # Alert at 100% of budget
+    threshold                  = 100
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = ["nandangrover.5@gmail.com"]
@@ -585,14 +636,14 @@ resource "aws_budgets_budget" "monthly" {
 resource "aws_budgets_budget" "daily" {
   name              = "green-detective-daily-budget"
   budget_type       = "COST"
-  limit_amount      = "1"  # Set your daily budget limit in USD
+  limit_amount      = "1"
   limit_unit        = "USD"
   time_period_start = "2024-01-01_00:00"
   time_unit         = "DAILY"
 
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                  = 80  # Alert at 80% of budget
+    threshold                  = 80
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = ["nandangrover.5@gmail.com"]
@@ -600,7 +651,7 @@ resource "aws_budgets_budget" "daily" {
 
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                  = 100  # Alert at 100% of budget
+    threshold                  = 100
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = ["nandangrover.5@gmail.com"]
