@@ -46,6 +46,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Delete existing API images
+        run: |
+          IMAGES=$(aws ecr list-images --repository-name ${{ env.ECR_REPOSITORY_API }} --query 'imageIds[*]' --output json)
+          if [ "$IMAGES" != "[]" ]; then
+            aws ecr batch-delete-image --repository-name ${{ env.ECR_REPOSITORY_API }} --image-ids "$IMAGES"
+          fi
+
+      - name: Delete existing Process images
+        run: |
+          IMAGES=$(aws ecr list-images --repository-name ${{ env.ECR_REPOSITORY_PROCESS }} --query 'imageIds[*]' --output json)
+          if [ "$IMAGES" != "[]" ]; then
+            aws ecr batch-delete-image --repository-name ${{ env.ECR_REPOSITORY_PROCESS }} --image-ids "$IMAGES"
+          fi
+
       - name: Build and tag API image
         run: |
           docker build --target service-api -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }} .

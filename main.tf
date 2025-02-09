@@ -144,8 +144,8 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "green-detective-api"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
@@ -153,6 +153,14 @@ resource "aws_ecs_task_definition" "api" {
       name      = "api"
       image     = "${data.aws_ecr_repository.api.repository_url}:latest"
       essential = true
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/green-detective-api"
+          "awslogs-region"        = "eu-west-2"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
       portMappings = [
         {
           containerPort = 8070
@@ -163,6 +171,10 @@ resource "aws_ecs_task_definition" "api" {
         {
           name  = "DJANGO_SETTINGS_MODULE"
           value = "green_detective.settings"
+        },
+        {
+          name  = "DEBUG"
+          value = "True"
         }
       ]
     }
@@ -194,8 +206,8 @@ resource "aws_ecs_task_definition" "process" {
   family                   = "green-detective-process"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
@@ -203,6 +215,14 @@ resource "aws_ecs_task_definition" "process" {
       name      = "process"
       image     = "${data.aws_ecr_repository.process.repository_url}:latest"
       essential = true
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/green-detective-process"
+          "awslogs-region"        = "eu-west-2"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
       portMappings = [
         {
           containerPort = 8071
@@ -213,6 +233,10 @@ resource "aws_ecs_task_definition" "process" {
         {
           name  = "DJANGO_SETTINGS_MODULE"
           value = "green_detective.settings"
+        },
+        {
+          name  = "DEBUG"
+          value = "True"
         }
       ]
     }
@@ -334,14 +358,55 @@ resource "aws_lb_target_group" "process" {
   }
 }
 
+# Remove the existing HTTP listener for port 80
+resource "aws_lb_listener" "api_http" {
+  count = 0  # This will remove the existing resource
+
+  # Required arguments
+  load_balancer_arn = aws_lb.green_detective.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  # Required default_action block
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "This listener is being removed"
+      status_code  = "200"
+    }
+  }
+}
+
+# Keep the HTTPS listener
 resource "aws_lb_listener" "api" {
+  load_balancer_arn = aws_lb.green_detective.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = "arn:aws:acm:eu-west-2:${data.aws_caller_identity.current.account_id}:certificate/6e10eefb-fd64-47bc-8062-49e01e3c0105"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+}
+
+# Add HTTP to HTTPS redirect
+resource "aws_lb_listener" "http_redirect" {
   load_balancer_arn = aws_lb.green_detective.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -575,11 +640,11 @@ resource "aws_appautoscaling_scheduled_action" "scale_up_morning" {
 
 # Outputs
 output "api_endpoint" {
-  value = aws_lb.green_detective.dns_name
+  value = "https://${aws_lb.green_detective.dns_name}"
 }
 
 output "process_endpoint" {
-  value = "${aws_lb.green_detective.dns_name}:81"
+  value = "https://${aws_lb.green_detective.dns_name}:81"
 }
 
 output "database_endpoint" {
@@ -657,3 +722,6 @@ resource "aws_budgets_budget" "daily" {
     subscriber_email_addresses = ["nandangrover.5@gmail.com"]
   }
 }
+
+# Add data source for current AWS account
+data "aws_caller_identity" "current" {}
