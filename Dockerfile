@@ -83,6 +83,10 @@ RUN apt-get update && \
 RUN chown -R ${APP_USER}:${APP_USER} ${WORKDIR} && \
     chown -R ${APP_USER}:${APP_USER} ${BOOTSTRAP_DIR}
 
+# Add this after installing dependencies
+RUN mkdir -p ${WORKDIR}/static && \
+    chown -R ${APP_USER}:${APP_USER} ${WORKDIR}/static
+
 FROM builder as builder-prd
 ENV APP_USER www-data
 # ENV APP_USER root
