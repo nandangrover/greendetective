@@ -10,7 +10,7 @@ class HealthCheckMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path == "/health-check":
+        if request.path in ["/health", "/health/"]:
             try:
                 # Check database connection
                 with connection.cursor() as cursor:

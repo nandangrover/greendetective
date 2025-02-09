@@ -91,9 +91,9 @@ resource "aws_route_table_association" "public_c" {
 }
 
 # Security Groups
-resource "aws_security_group" "ecs" {
-  name        = "green-detective-ecs-sg"
-  description = "Allow inbound traffic"
+resource "aws_security_group" "alb" {
+  name        = "green-detective-alb-sg"
+  description = "Allow inbound traffic to ALB"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -108,6 +108,26 @@ resource "aws_security_group" "ecs" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "ecs" {
+  name        = "green-detective-ecs-sg"
+  description = "Allow inbound traffic"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 8070
+    to_port     = 8070
+    protocol    = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
 
   egress {
@@ -159,6 +179,16 @@ resource "aws_ecs_task_definition" "api" {
       name      = "api"
       image     = "${data.aws_ecr_repository.api.repository_url}:latest"
       essential = true
+
+      # Add health check configuration
+      healthCheck = {
+        command = ["CMD-SHELL", "curl -f http://localhost:8070/health/ || exit 1"]
+        interval = 30
+        timeout = 5
+        retries = 3
+        startPeriod = 60
+      }
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -189,6 +219,9 @@ resource "aws_ecs_service" "api" {
   task_definition = aws_ecs_task_definition.api.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+
+  # Add health check grace period
+  health_check_grace_period_seconds = 300
 
   network_configuration {
     subnets          = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
@@ -225,12 +258,6 @@ resource "aws_ecs_task_definition" "process" {
           "awslogs-stream-prefix" = "ecs"
         }
       }
-      portMappings = [
-        {
-          containerPort = 8071
-          hostPort      = 8071
-        }
-      ]
       secrets = [
         {
           name = "ENV_FILE"
@@ -252,12 +279,6 @@ resource "aws_ecs_service" "process" {
     subnets          = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
     security_groups  = [aws_security_group.ecs.id, aws_security_group.ecr_endpoint.id]
     assign_public_ip = true
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.process.arn
-    container_name   = "process"
-    container_port   = 8071
   }
 }
 
@@ -316,7 +337,7 @@ resource "aws_lb" "green_detective" {
   name               = "green-detective-lb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.ecs.id]
+  security_groups    = [aws_security_group.alb.id]
   subnets            = [aws_subnet.public.id, aws_subnet.public_b.id, aws_subnet.public_c.id]
 
   enable_deletion_protection = false
@@ -330,25 +351,12 @@ resource "aws_lb_target_group" "api" {
   vpc_id   = aws_vpc.main.id
   target_type = "ip"
 
-  health_check {
-    path                = "/health/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    matcher             = "200"
-  }
-}
-
-resource "aws_lb_target_group" "process" {
-  name     = "green-detective-process-tg"
-  port     = 8071
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
-  target_type = "ip"
+  # Add these parameters
+  deregistration_delay = 300
+  slow_start = 30
 
   health_check {
-    path                = "/health/"
+    path                = "/health"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 3
@@ -406,17 +414,6 @@ resource "aws_lb_listener" "http_redirect" {
       protocol    = "HTTPS"
       status_code = "HTTP_301"
     }
-  }
-}
-
-resource "aws_lb_listener" "process" {
-  load_balancer_arn = aws_lb.green_detective.arn
-  port              = "81"
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.process.arn
   }
 }
 
@@ -645,10 +642,6 @@ resource "aws_appautoscaling_scheduled_action" "scale_up_morning" {
 # Outputs
 output "api_endpoint" {
   value = "https://${aws_lb.green_detective.dns_name}"
-}
-
-output "process_endpoint" {
-  value = "https://${aws_lb.green_detective.dns_name}:81"
 }
 
 output "database_endpoint" {
