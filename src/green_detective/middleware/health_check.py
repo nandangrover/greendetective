@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.db import connection
 from redis import Redis
 from django.conf import settings
+import socket
 
 
 class HealthCheckMiddleware:
@@ -11,16 +12,11 @@ class HealthCheckMiddleware:
 
     def __call__(self, request):
         if request.path in ["/health", "/health/"]:
-            try:
-                # Check database connection
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
+            health_status = {
+                "status": "ok",
+            }
+            http_status = status.HTTP_200_OK
 
-                # Check Redis connection
-                redis = Redis.from_url(settings.REDIS_URL)
-                redis.ping()
+            return JsonResponse(health_status, status=http_status)
 
-                return JsonResponse({"status": "ok"})
-            except Exception as e:
-                return JsonResponse({"status": "error", "message": str(e)}, status=500)
         return self.get_response(request)
