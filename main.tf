@@ -439,7 +439,10 @@ resource "aws_iam_role_policy" "ecs_full_access" {
         Action = [
           "ecr:*",
           "s3:*",
-          "ecs:*"
+          "ecs:*",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:CreateLogGroup"
         ]
         Resource = "*"
       }
