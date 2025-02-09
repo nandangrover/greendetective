@@ -6,9 +6,18 @@ echo "Starting API service..."
 echo "Environment variables:"
 printenv
 
-# Wait for database to be ready
+# Wait for database to be ready using a simple loop
 echo "Waiting for database..."
-python manage.py wait_for_db --timeout=60
+counter=0
+until python manage.py check --database default; do
+    counter=$((counter+1))
+    if [ $counter -gt 60 ]; then
+        echo "Database connection timed out!"
+        exit 1
+    fi
+    echo "Database not ready yet. Waiting..."
+    sleep 1
+done
 
 # Run migrations
 echo "Running migrations..."

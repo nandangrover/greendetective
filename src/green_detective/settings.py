@@ -134,12 +134,16 @@ boto3_logs_client = None
 
 # Figure out a way to make Translate work in docker
 if IS_LOCAL is False:
-    boto3_logs_client = boto3.client(
-        "logs",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=os.getenv("AWS_CLOUDWATCH_REGION", os.getenv("AWS_DEFAULT_REGION")),
-    )
+    try:
+        boto3_logs_client = boto3.client(
+            "logs",
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("AWS_DEFAULT_REGION", "eu-west-2"),
+        )
+    except Exception as e:
+        print(f"Failed to initialize CloudWatch client: {e}")
+        boto3_logs_client = None
 
 LOGGERS_COMMON = {
     "": {
@@ -195,14 +199,11 @@ LOGGING = {
                 "level": "INFO",
                 "class": "watchtower.CloudWatchLogHandler",
                 "boto3_client": boto3_logs_client,
-                "log_group": "{}-{}".format(
-                    os.getenv("AWS_LOG_GROUP"),
-                    SERVER_ENVIRONMENT.capitalize(),
-                ),
+                "log_group": f"{os.getenv('AWS_LOG_GROUP', 'green-detective')}-{SERVER_ENVIRONMENT.capitalize()}",
                 "stream_name": "{machine_name}/{logger_name}",
                 "formatter": "common",
             }
-            if IS_LOCAL is False and boto3_logs_client is not None
+            if boto3_logs_client is not None
             else {
                 "level": "INFO",
                 "class": "logging.StreamHandler",
