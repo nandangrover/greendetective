@@ -167,14 +167,10 @@ resource "aws_ecs_task_definition" "api" {
           hostPort      = 8070
         }
       ]
-      environment = [
+      secrets = [
         {
-          name  = "DJANGO_SETTINGS_MODULE"
-          value = "green_detective.settings"
-        },
-        {
-          name  = "DEBUG"
-          value = "True"
+          name = "ENV_FILE"
+          valueFrom = aws_secretsmanager_secret.env_variables.arn
         }
       ]
     }
@@ -229,14 +225,10 @@ resource "aws_ecs_task_definition" "process" {
           hostPort      = 8071
         }
       ]
-      environment = [
+      secrets = [
         {
-          name  = "DJANGO_SETTINGS_MODULE"
-          value = "green_detective.settings"
-        },
-        {
-          name  = "DEBUG"
-          value = "True"
+          name = "ENV_FILE"
+          valueFrom = aws_secretsmanager_secret.env_variables.arn
         }
       ]
     }
@@ -728,3 +720,51 @@ resource "aws_budgets_budget" "daily" {
 
 # Add data source for current AWS account
 data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role_policy" "ecs_s3_access" {
+  name = "green-detective-s3-access"
+  role = data.aws_iam_role.ecs_task_execution_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "arn:aws:s3:::greendetective-env/live.env"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_secrets_access" {
+  name = "green-detective-secrets-access"
+  role = data.aws_iam_role.ecs_task_execution_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.env_variables.arn
+      }
+    ]
+  })
+}
+
+resource "aws_secretsmanager_secret" "env_variables" {
+  name = "green-detective-env-variables"
+}
+
+resource "aws_secretsmanager_secret_version" "env_variables" {
+  secret_id = aws_secretsmanager_secret.env_variables.id
+  secret_string = jsonencode({
+    ENV_FILE = "s3://prod-greendetective/live.env"
+    # Add other environment variables here if needed
+  })
+}
