@@ -28,7 +28,7 @@ from detective.admin import admin_site
 
 
 v1_urlpatterns = [
-    path("admin/", admin_site.urls),
+    path("dap/", admin_site.urls),
     path("api/v1/detective/", include("detective.urls")),
     path("api/v1/token", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/v1/token/refresh", TokenRefreshView.as_view(), name="token_refresh"),

@@ -13,8 +13,8 @@ User = get_user_model()
 
 
 class InviteMonitoringAdmin(admin.AdminSite):
-    site_header = "GreenDetective Admin"
-    site_title = "GreenDetective Admin Portal"
+    site_header = "Detective Admin Panel 💡"
+    site_title = "Detective Admin Portal"
     index_title = "Welcome to GreenDetective Admin"
 
     def get_urls(self):
@@ -37,9 +37,9 @@ class InviteMonitoringAdmin(admin.AdminSite):
 
         # Profile statistics
         profile_stats = UserProfile.objects.aggregate(
-            total=Count("id"),
-            verified=Count("id", filter=Q(email_verified=True)),
-            with_business=Count("id", filter=~Q(business=None)),
+            total=Count("uuid"),
+            verified=Count("uuid", filter=Q(email_verified=True)),
+            with_business=Count("uuid", filter=~Q(business=None)),
         )
 
         # Business statistics
