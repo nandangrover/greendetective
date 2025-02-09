@@ -202,7 +202,7 @@ LOGGING = {
                 "stream_name": "{machine_name}/{logger_name}",
                 "formatter": "common",
             }
-            if IS_LOCAL is False
+            if IS_LOCAL is False and boto3_logs_client is not None
             else {
                 "level": "INFO",
                 "class": "logging.StreamHandler",

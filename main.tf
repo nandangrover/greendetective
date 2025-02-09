@@ -5,6 +5,11 @@ provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
+
+  # Add these settings
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
 }
 
 # VPC and Networking
@@ -147,6 +152,7 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = "512"
   memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -434,7 +440,9 @@ resource "aws_iam_role_policy" "ecs_full_access" {
           "ecs:*",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:CreateLogGroup"
+          "logs:CreateLogGroup",
+          "logs:DescribeLogStreams",
+          "logs:PutRetentionPolicy"
         ]
         Resource = "*"
       }
@@ -767,4 +775,16 @@ resource "aws_secretsmanager_secret_version" "env_variables" {
     ENV_FILE = "s3://prod-greendetective/live.env"
     # Add other environment variables here if needed
   })
+}
+
+resource "aws_vpc_endpoint" "ec2" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.eu-west-2.ec2"
+  vpc_endpoint_type = "Interface"
+
+  security_group_ids = [
+    aws_security_group.ecs.id,
+  ]
+
+  private_dns_enabled = true
 }
