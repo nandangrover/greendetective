@@ -6,22 +6,15 @@ echo "Starting API service..."
 echo "Environment variables:"
 printenv
 
-# Wait for the database to be ready
-while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
-  echo "Waiting for database to be ready..."
-  sleep 2
-done
-
-# Install pgvector as a regular extension
-echo "Installing pgvector extension..."
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME <<-EOSQL
-    CREATE EXTENSION IF NOT EXISTS vector;
-EOSQL
-
 # Run migrations
 echo "Running migrations..."
 python manage.py migrate
 
+# Create superuser
+python manage.py ensure_adminuser --noinput
+
 # Start the server
-echo "Starting Gunicorn..."
-exec gunicorn green_detective.wsgi:application --bind 0.0.0.0:8070 --workers 3 --log-level debug
+# Run Gunicorn command with specified configurations
+gunicorn green_detective.wsgi -c ${BOOTSTRAP_DIR}/service/service-api/gunicorn-config.py ${GUNICORN_ARGS}
+
+exec "$@"
