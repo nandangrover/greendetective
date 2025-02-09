@@ -271,6 +271,7 @@ resource "aws_db_subnet_group" "main" {
   }
 }
 
+# Then modify the aws_db_instance resource
 resource "aws_db_instance" "green_detective" {
   identifier             = "green-detective-db"
   allocated_storage      = 20
@@ -281,7 +282,7 @@ resource "aws_db_instance" "green_detective" {
   db_name                = "greendetective"
   username               = "root"
   password               = var.db_password
-  parameter_group_name   = "default.postgres17"
+  parameter_group_name   = "default.postgres17"  # Revert to default parameter group
   publicly_accessible    = false
   skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.rds.id]

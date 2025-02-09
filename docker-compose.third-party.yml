@@ -24,7 +24,7 @@ services:
   green-detective-postgresdb:
     container_name: green-detective-postgresdb
     image: ankane/pgvector:latest
-    command: postgres -c 'max_connections=300'
+    command: postgres -c 'max_connections=300' -c 'shared_preload_libraries=pgvector'
     shm_size: 256m
     volumes:
       - ./docker/database_mount/pgsql_docker_mount:/var/lib/postgresql/data

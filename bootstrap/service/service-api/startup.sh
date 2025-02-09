@@ -6,18 +6,17 @@ echo "Starting API service..."
 echo "Environment variables:"
 printenv
 
-# Wait for database to be ready using a simple loop
-echo "Waiting for database..."
-counter=0
-until python manage.py check --database default; do
-    counter=$((counter+1))
-    if [ $counter -gt 60 ]; then
-        echo "Database connection timed out!"
-        exit 1
-    fi
-    echo "Database not ready yet. Waiting..."
-    sleep 1
+# Wait for the database to be ready
+while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
+  echo "Waiting for database to be ready..."
+  sleep 2
 done
+
+# Install pgvector as a regular extension
+echo "Installing pgvector extension..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME <<-EOSQL
+    CREATE EXTENSION IF NOT EXISTS vector;
+EOSQL
 
 # Run migrations
 echo "Running migrations..."
