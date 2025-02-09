@@ -82,26 +82,14 @@ jobs:
 
       - name: Force new ECS deployment for API service
         run: |
-          LATEST_REVISION=$(aws ecs describe-task-definition \
-            --task-definition ${{ env.ECS_SERVICE_API }} \
-            --query 'taskDefinition.revision' \
-            --output text)
-
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.ECS_SERVICE_API }} \
-            --task-definition ${{ env.ECS_SERVICE_API }}:$LATEST_REVISION \
             --force-new-deployment
 
       - name: Force new ECS deployment for Process service
         run: |
-          LATEST_REVISION=$(aws ecs describe-task-definition \
-            --task-definition ${{ env.ECS_SERVICE_PROCESS }} \
-            --query 'taskDefinition.revision' \
-            --output text)
-
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.ECS_SERVICE_PROCESS }} \
-            --task-definition ${{ env.ECS_SERVICE_PROCESS }}:$LATEST_REVISION \
             --force-new-deployment
