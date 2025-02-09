@@ -12,8 +12,8 @@ env:
   ECR_REPOSITORY_API: green-detective-api
   ECR_REPOSITORY_PROCESS: green-detective-process
   ECS_CLUSTER: green-detective
-  ECS_SERVICE_API: green-detective-api
-  ECS_SERVICE_PROCESS: green-detective-process
+  ECS_SERVICE_API: api
+  ECS_SERVICE_PROCESS: process
 
 jobs:
   build-and-push:
