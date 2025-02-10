@@ -59,6 +59,8 @@ services:
   green-detective-mailhog:
     container_name: green-detective-mailhog
     image: mailhog/mailhog
+    logging:
+      driver: 'none'
     ports:
       - "1025:1025"  # SMTP server
       - "8025:8025"  # Web interface
