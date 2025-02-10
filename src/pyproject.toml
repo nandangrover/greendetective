@@ -2,7 +2,7 @@
 name = "green-detective"
 version = "0.1.0"
 description = ""
-authors = ["Green Detective <info@greendetective.com>"]
+authors = ["Green Detective <info@greendetective.earth>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"

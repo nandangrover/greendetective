@@ -612,33 +612,6 @@ resource "aws_appautoscaling_policy" "process_cpu" {
   depends_on = [aws_appautoscaling_target.process]
 }
 
-# Add auto-scaling policies to scale down during off-hours
-resource "aws_appautoscaling_scheduled_action" "scale_down_night" {
-  name               = "scale-down-night"
-  service_namespace  = "ecs"
-  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  schedule          = "cron(0 22 * * ? *)"
-
-  scalable_target_action {
-    min_capacity = 0
-    max_capacity = 0
-  }
-}
-
-resource "aws_appautoscaling_scheduled_action" "scale_up_morning" {
-  name               = "scale-up-morning"
-  service_namespace  = "ecs"
-  resource_id        = "service/${aws_ecs_cluster.green_detective.name}/${aws_ecs_service.api.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  schedule          = "cron(0 6 * * ? *)"
-
-  scalable_target_action {
-    min_capacity = 1
-    max_capacity = 1
-  }
-}
-
 # Outputs
 output "api_endpoint" {
   value = "https://${aws_lb.green_detective.dns_name}"

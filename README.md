@@ -84,4 +84,4 @@ MIT License - see the [LICENSE](LICENSE) file for details
 
 ## Contact
 
-Please contact us at [info@greendetective.com](mailto:info@greendetective.com)
+Please contact us at [info@greendetective.earth](mailto:info@greendetective.earth)

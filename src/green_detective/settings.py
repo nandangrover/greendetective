@@ -435,7 +435,7 @@ SIMPLE_JWT = {
 }
 
 # Email settings
-if SERVER_ENVIRONMENT == "local":
+if SERVER_ENVIRONMENT == "sandbox":
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = "green-detective-mailhog"
     EMAIL_PORT = 1025
