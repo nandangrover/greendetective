@@ -74,7 +74,7 @@ class UserSerializer(serializers.ModelSerializer):
         invite_code = validated_data.pop("invite_code")
         profile_data = validated_data.pop("profile", {})
         business_data = profile_data.pop("business", None)
-        # Create user first
+
         user = User.objects.create_user(
             username=validated_data["username"],
             email=validated_data["email"],
@@ -86,9 +86,12 @@ class UserSerializer(serializers.ModelSerializer):
             business = Business.objects.create(**business_data)
             user.profile.business = business
 
-        # Update profile
-        user.profile.job_title = profile_data.get("job_title", "")
-        user.profile.phone = profile_data.get("phone", "")
+        user.refresh_from_db()
+
+        profile = profile_data.pop("profile", {})
+
+        user.profile.job_title = profile.get("job_title", "")
+        user.profile.phone = profile.get("phone", "")
         user.profile.save()
 
         # Mark invite code as used
