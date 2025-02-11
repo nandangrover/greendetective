@@ -49,7 +49,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer()
     invite_code = serializers.CharField(write_only=True)
-    business = BusinessSerializer(required=False, allow_null=True, write_only=True)
+    business = BusinessSerializer(required=False, allow_null=True)
 
     class Meta:
         model = User
@@ -71,20 +71,9 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid or expired invite code")
 
     def create(self, validated_data):
-        print(validated_data, "validated_data")
         invite_code = validated_data.pop("invite_code")
         profile_data = validated_data.pop("profile", {})
         business_data = profile_data.pop("business", None)
-
-        print(
-            business_data,
-            "business_data",
-            profile_data,
-            "profile_data",
-            validated_data,
-            "validated_data",
-        )
-
         # Create user first
         user = User.objects.create_user(
             username=validated_data["username"],
@@ -92,7 +81,6 @@ class UserSerializer(serializers.ModelSerializer):
             password=validated_data["password"],
         )
 
-        # Create business if data is provided
         business = None
         if business_data:
             business = Business.objects.create(**business_data)
