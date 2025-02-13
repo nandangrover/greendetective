@@ -191,7 +191,8 @@ class Scraper:
 
     def _scrape_pdf_content(self, url):
         try:
-            response = requests.get(url, headers=self.headers)
+            # Add verify=False to bypass SSL certificate verification
+            response = requests.get(url, headers=self.headers, verify=False)
 
             # Check if the content type is actually a PDF
             content_type = response.headers.get("Content-Type", "")
