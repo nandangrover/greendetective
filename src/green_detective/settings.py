@@ -22,6 +22,7 @@ from celery.schedules import crontab
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 import redis
+import json
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -325,13 +326,11 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DBNAME"),
-        "HOST": os.getenv("DBHOST"),
         "USER": os.getenv("DBUSER"),
         "PASSWORD": os.getenv("DBPASS"),
+        "HOST": os.getenv("DBHOST"),
         "PORT": os.getenv("DBPORT"),
-        "TEST": {
-            "NAME": os.getenv("TEST_DBNAME", "{}_test".format(os.getenv("DBNAME"))),
-        },
+        "OPTIONS": json.loads(os.getenv("DB_OPTIONS", "{}")),
     }
 }
 
@@ -453,3 +452,10 @@ REDIS_CONN = redis.Redis(
     db=int(os.getenv("REDIS_DB", 0)),
     decode_responses=True,
 )
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "max_retries": 3,
+    "interval_start": 0,
+    "interval_step": 0.2,
+    "interval_max": 0.5,
+}
