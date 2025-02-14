@@ -92,7 +92,7 @@ ratelimit = "2.2.1"
 cloudscraper = "1.2.71"
 undetected-chromedriver = "3.5.5"
 selenium = "4.28.1"
-
+django-db-geventpool = "4.0.7"
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.group.dev.dependencies]

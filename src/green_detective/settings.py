@@ -275,6 +275,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "green_detective",
     "detective",
+    "django_db_geventpool",
 ]
 
 MIDDLEWARE = [
@@ -340,6 +341,9 @@ DATABASES = {
             "keepalives_interval": 10,
             "keepalives_count": 5,
             "MAX_CONNS": 20,
+            "MIN_CONNS": 5,
+            "REUSE_CONNS": True,
+            "TIMEOUT": 30,
         },
     }
 }

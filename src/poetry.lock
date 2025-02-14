@@ -843,6 +843,20 @@ files = [
 Django = ">=1.8"
 
 [[package]]
+name = "django-db-geventpool"
+version = "4.0.7"
+description = "Add a DB connection pool using gevent to django"
+optional = false
+python-versions = "*"
+files = [
+    {file = "django_db_geventpool-4.0.7-py2.py3-none-any.whl", hash = "sha256:4e93d34df4782dfbe3e92271d70f22f0cde7d0d3baebda72506a13934fcf3761"},
+    {file = "django_db_geventpool-4.0.7.tar.gz", hash = "sha256:face4e9b78aad1b758a6251ad627206924ec6d868b0b6a8ea46356e2b73f48e1"},
+]
+
+[package.dependencies]
+django = ">=3.1"
+
+[[package]]
 name = "django-extensions"
 version = "3.2.3"
 description = "Extensions for Django"
@@ -3277,4 +3291,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "3e3be866c4ba4615c16ee73b102c4d075459e7bd22711d859c8def8f32673dc0"
+content-hash = "1a2fd8c606a4f39181ac27f06e51e60ad4cd7dbff9cf4857ee7915234c9b8ad8"
