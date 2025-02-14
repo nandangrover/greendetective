@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 from .utils import to_bool
 from datetime import timedelta
 from urllib.parse import urlparse
+from django.db import connections
+from django.core.signals import request_finished
 from celery.schedules import crontab
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -459,3 +461,11 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "interval_step": 0.2,
     "interval_max": 0.5,
 }
+
+
+def close_db_connection(sender, **kwargs):
+    for conn in connections.all():
+        conn.close_if_unusable_or_obsolete()
+
+
+request_finished.connect(close_db_connection)
