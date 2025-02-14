@@ -326,13 +326,21 @@ WSGI_APPLICATION = "green_detective.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django_db_geventpool.backends.postgresql_psycopg2",
         "NAME": os.getenv("DBNAME"),
         "USER": os.getenv("DBUSER"),
         "PASSWORD": os.getenv("DBPASS"),
         "HOST": os.getenv("DBHOST"),
         "PORT": os.getenv("DBPORT"),
-        "OPTIONS": json.loads(os.getenv("DB_OPTIONS", "{}")),
+        "OPTIONS": {
+            "sslmode": "disable",
+            "connect_timeout": 30,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+            "MAX_CONNS": 20,
+        },
     }
 }
 
