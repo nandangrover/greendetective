@@ -24,7 +24,6 @@ from celery.schedules import crontab
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 import redis
-import json
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -327,23 +326,14 @@ WSGI_APPLICATION = "green_detective.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django_db_geventpool.backends.postgresql_psycopg2",
-        "NAME": os.getenv("DBNAME"),
-        "USER": os.getenv("DBUSER"),
-        "PASSWORD": os.getenv("DBPASS"),
-        "HOST": os.getenv("DBHOST"),
-        "PORT": os.getenv("DBPORT"),
-        "OPTIONS": {
-            "sslmode": "disable",
-            "connect_timeout": 30,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-            "MAX_CONNS": 20,
-            "MIN_CONNS": 5,
-            "REUSE_CONNS": True,
-            "TIMEOUT": 30,
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DBNAME"),
+        "USER": os.environ.get("DBUSER"),
+        "PASSWORD": os.environ.get("DBPASS"),
+        "HOST": os.environ.get("DBHOST"),
+        "PORT": os.environ.get("DBPORT"),
+        "TEST": {
+            "NAME": os.environ.get("TEST_DBNAME", "{}_test".format(os.environ.get("DBNAME"))),
         },
     }
 }
