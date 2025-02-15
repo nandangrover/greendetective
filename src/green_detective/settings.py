@@ -274,7 +274,6 @@ INSTALLED_APPS = [
     "corsheaders",
     "green_detective",
     "detective",
-    "django_db_geventpool",
 ]
 
 MIDDLEWARE = [
