@@ -7,6 +7,8 @@ from celery import chord
 
 logger = logging.getLogger(__name__)
 
+RECORDS_EXPIRE_AFTER_DAYS = 7
+
 
 def move_report_to_processing(report: Report) -> None:
     """
@@ -75,6 +77,8 @@ def process_urls(company_id: int, company: Company, report: Report) -> None:
 
     urls_to_process = report.urls if report.urls and len(report.urls) > 0 else None
 
+    expire_date = datetime.now(timezone.utc) - timedelta(days=RECORDS_EXPIRE_AFTER_DAYS)
+
     # If urls_to_process is not empty, then mark all records apart from the ones in urls_to_process as defunct
     if urls_to_process:
         defunct_staging = Staging.objects.filter(company_id=company_id, defunct=False).exclude(
@@ -86,13 +90,12 @@ def process_urls(company_id: int, company: Company, report: Report) -> None:
         # Mark all related raw statistics as defunct
         RawStatistics.objects.filter(staging__in=defunct_staging).update(defunct=True)
 
-        # Only mark records as pending if they haven't been updated in the last day
-        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        # Only mark records as pending if they haven't been updated in the last week
         pending_staging = Staging.objects.filter(
             company_id=company_id,
             defunct=False,
             url__in=urls_to_process,
-            updated_at__lt=one_day_ago,
+            updated_at__lt=expire_date,
         )
 
         if pending_staging.count() > 0:
@@ -104,10 +107,9 @@ def process_urls(company_id: int, company: Company, report: Report) -> None:
             logger.info("No pending staging records found")
 
     else:
-        # Only mark records as pending if they haven't been updated in the last hour
-        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        # Only mark records as pending if they haven't been updated in the last week
         pending_staging = Staging.objects.filter(
-            company_id=company_id, updated_at__lt=one_day_ago
+            company_id=company_id, updated_at__lt=expire_date
         )
 
         if pending_staging.count() > 0:

@@ -65,11 +65,3 @@ repos:
         language: system
         always_run: true
         types: [bash]
-      # - id: unit-tests
-      #   name: Unit Tests
-      #   stages:
-      #     - pre-push
-      #   entry: bash -c '[[ "$SKIP_UNIT_TESTS" != "true" ]] && docker exec emission-engine-service-api bash -c "python manage.py test --noinput" || (echo "Unit tests failed!" && exit 1)'
-      #   language: system
-      #   always_run: true
-      #   types: [bash]

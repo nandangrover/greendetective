@@ -44,8 +44,8 @@ class TriggerDetectiveSerializer(serializers.Serializer):
 
         user = self.context["request"].user
 
-        # Return existing report if it exists and created within the last day
-        if report and report.created_at > timezone.now() - timedelta(days=1):
+        # Return existing report if it exists and created within the last week
+        if report and report.created_at > timezone.now() - timedelta(days=7):
             presigned_url = S3Client().get_report_url(report=report.report_file.name)
             return (
                 report.uuid,

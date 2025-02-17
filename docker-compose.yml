@@ -38,6 +38,7 @@ services:
         - TARGET_ENV=dev
     volumes:
       - ./src:/var/www/green-detective
+    env_file: ./src/.env
     depends_on:
       - green-detective-localstack-s3
       - green-detective-postgresdb

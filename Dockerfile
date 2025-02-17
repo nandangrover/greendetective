@@ -17,8 +17,13 @@ ADD ./bootstrap ${BOOTSTRAP_DIR}
 # Install essential packages
 RUN apt-get update && \
     apt-get install -y vim && \
+    apt-get install -y screen && \
+    apt-get install -y net-tools && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+# Add defshell -bash to .screenrc
+RUN echo "defshell -bash" >> ~/.screenrc
 
 # Install poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python3 - && \
@@ -44,6 +49,12 @@ ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 # Install python dependencies
 RUN rm -rf ~/.cache/pip && \
     poetry install --with dev
+
+# Code change monitoring
+RUN apt-get update && \
+    apt-get install -y inotify-tools && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 FROM builder as builder-dev
 ENV APP_USER root
@@ -105,11 +116,19 @@ ENTRYPOINT ${BOOTSTRAP_DIR}/service/service-api/startup.sh
 
 FROM builder-${TARGET_ENV} as service-process
 # Image configs
-USER ${APP_USER}
+ENV SUPERVISOR_LOGDIR ${WORKDIR}/logs/supervisor
+RUN apt-get update && \
+    apt-get install -y supervisor && \
+    cat ${BOOTSTRAP_DIR}/service/configs/${TARGET_ENV}/supervisord.conf >> ${BOOTSTRAP_DIR}/service/service-process/supervisord.conf && \
+    ln -sf ${BOOTSTRAP_DIR}/service/service-process/supervisord.conf /etc/supervisor/supervisord.conf && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
+USER ${APP_USER}
 CMD ${BOOTSTRAP_DIR}/service/service-process/startup.sh
 
-FROM builder-${TARGET_ENV} as task-process
+
+FROM builder-${TARGET_ENV} AS task-process
 # Image configs
 USER ${APP_USER}
 

@@ -46,6 +46,23 @@ Green Detective is a Django-based web application that helps detect and analyze 
    $ docker-compose up
    ```
 
+### Logging into an ECS service
+1. Ensure `aws-cli`, `jq` and `session-manager-plugin` is installed
+2. Configure aws-cli
+```shell
+# You will need your AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY. Set AWS_REGION to 'eu-west-2'
+aws configure
+```
+3. Login into the service
+```shell
+# XYZ is the service name
+$ ./aws-ecs-service.sh -s XYZ -f login
+```
+4. If you got this error: __Execute command is not enabled for XYZ__, then we need to enable that
+```shell
+$ ./aws-ecs-service.sh -s XYZ -f enable_execute_command
+```
+
 ## Services
 
 The application consists of several services:
@@ -57,6 +74,7 @@ The application consists of several services:
 - **Redis**: Message broker and caching (port 9379)
 - **LocalStack**: S3-compatible storage for local development (port 4566)
 - **MailHog**: Email testing interface (ports 1025, 8025)
+
 
 ## Development Tools
 

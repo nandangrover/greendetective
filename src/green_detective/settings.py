@@ -102,7 +102,7 @@ CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", 1800))
 CELERY_WORKER_PREFETCH_MULTIPLIER = os.environ.get("CELERY_WORKER_PREFETCH_MULTIPLIER", 1)
 CELERY_TASK_CREATE_MISSING_QUEUES = True
 CELERY_TASK_INHERIT_PARENT_PRIORITY = True
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER", os.getenv("REDIS_HOST"))
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_HOST"))
 
 # Queues
 CELERY_QUEUE_GENERAL = "gd_general"
@@ -238,7 +238,7 @@ LOGGING = {
             "filename": "{}/cron.log".format(LOG_ROOT),
         },
         "celery": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.TimedRotatingFileHandler",
             "when": "midnight",
             "backupCount": 180,
